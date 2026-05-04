@@ -202,7 +202,7 @@ After publishing, Codex can launch the optimized executable directly:
 
 ```toml
 [mcp_servers.codex-computer-run]
-command = "D:\\Projects\\Github\\chrispulman\\CodexComputerRunMCPServer\\artifacts\\publish\\win-x64\\CodexComputerRunMCPServer.exe"
+command = "PathTo\\CodexComputerRunMCPServer\\artifacts\\publish\\win-x64\\CodexComputerRunMCPServer.exe"
 args = []
 ```
 
@@ -216,7 +216,7 @@ Published executable:
 {
   "mcpServers": {
     "codex-computer-run": {
-      "command": "D:\\Projects\\Github\\chrispulman\\CodexComputerRunMCPServer\\artifacts\\publish\\win-x64\\CodexComputerRunMCPServer.exe",
+      "command": "PathTo\\CodexComputerRunMCPServer\\artifacts\\publish\\win-x64\\CodexComputerRunMCPServer.exe",
       "args": []
     }
   }
@@ -233,7 +233,7 @@ Development source run:
       "args": [
         "run",
         "--project",
-        "D:\\Projects\\Github\\chrispulman\\CodexComputerRunMCPServer\\src\\CodexComputerRunMCPServer\\CodexComputerRunMCPServer.csproj",
+        "PathTo\\CodexComputerRunMCPServer\\src\\CodexComputerRunMCPServer\\CodexComputerRunMCPServer.csproj",
         "--configuration",
         "Release",
         "--no-launch-profile"
