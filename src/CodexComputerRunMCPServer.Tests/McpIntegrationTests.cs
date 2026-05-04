@@ -84,7 +84,7 @@ public class McpIntegrationTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "CodexComputerRunMCPServer.slnx")))
+            if (File.Exists(Path.Combine(directory.FullName, "Readme.md")))
             {
                 return directory.FullName;
             }
