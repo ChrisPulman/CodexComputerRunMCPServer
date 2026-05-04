@@ -5,7 +5,6 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Windows.Forms;
 
 namespace CodexComputerRunMCPServer;
 
@@ -33,25 +32,17 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
     /// </exception>
     public Rectangle GetVirtualScreenBounds()
     {
-        var virtualScreen = SystemInformation.VirtualScreen;
-        if (virtualScreen.Width > 0 && virtualScreen.Height > 0)
+        var left = NativeMethods.GetSystemMetrics(NativeMethods.SystemMetricVirtualScreenLeft);
+        var top = NativeMethods.GetSystemMetrics(NativeMethods.SystemMetricVirtualScreenTop);
+        var width = NativeMethods.GetSystemMetrics(NativeMethods.SystemMetricVirtualScreenWidth);
+        var height = NativeMethods.GetSystemMetrics(NativeMethods.SystemMetricVirtualScreenHeight);
+
+        if (width <= 0 || height <= 0)
         {
-            return virtualScreen;
+            throw new InvalidOperationException("No Windows screens are available.");
         }
 
-        var screens = Screen.AllScreens;
-        if (screens.Length == 0)
-        {
-            return Screen.PrimaryScreen?.Bounds ?? throw new InvalidOperationException("No Windows screens are available.");
-        }
-
-        var bounds = screens[0].Bounds;
-        for (var i = 1; i < screens.Length; i++)
-        {
-            bounds = Rectangle.Union(bounds, screens[i].Bounds);
-        }
-
-        return bounds;
+        return new Rectangle(left, top, width, height);
     }
 
     /// <summary>
@@ -331,6 +322,7 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
     /// <param name="output">The destination stream for PNG data.</param>
     private static void CapturePng(Rectangle bounds, Stream output)
     {
+#pragma warning disable CA1416 // Runtime entrypoints guard Windows-only calls before this platform implementation is used.
         using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
         using (var graphics = Graphics.FromImage(bitmap))
         {
@@ -338,6 +330,7 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
         }
 
         bitmap.Save(output, ImageFormat.Png);
+#pragma warning restore CA1416
     }
 
     /// <summary>

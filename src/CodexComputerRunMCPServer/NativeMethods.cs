@@ -75,6 +75,26 @@ internal static partial class NativeMethods
     public const uint GmemMoveable = 0x0002;
 
     /// <summary>
+    /// X coordinate of the virtual screen.
+    /// </summary>
+    public const int SystemMetricVirtualScreenLeft = 76;
+
+    /// <summary>
+    /// Y coordinate of the virtual screen.
+    /// </summary>
+    public const int SystemMetricVirtualScreenTop = 77;
+
+    /// <summary>
+    /// Width of the virtual screen.
+    /// </summary>
+    public const int SystemMetricVirtualScreenWidth = 78;
+
+    /// <summary>
+    /// Height of the virtual screen.
+    /// </summary>
+    public const int SystemMetricVirtualScreenHeight = 79;
+
+    /// <summary>
     /// Callback delegate used by <see cref="EnumWindows"/> to enumerate top-level windows.
     /// </summary>
     /// <param name="hWnd">Handle to the current top-level window.</param>
@@ -260,6 +280,14 @@ internal static partial class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetCursorPos(out Point point);
+
+    /// <summary>
+    /// Retrieves the specified system metric or system configuration setting.
+    /// </summary>
+    /// <param name="index">System metric index.</param>
+    /// <returns>The requested system metric value.</returns>
+    [DllImport("user32.dll")]
+    public static extern int GetSystemMetrics(int index);
 
     /// <summary>
     /// Translates a character to the corresponding virtual-key code and shift state.

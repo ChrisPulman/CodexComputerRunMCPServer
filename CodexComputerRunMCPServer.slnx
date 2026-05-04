@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/CodexComputerRunMCPServer/CodexComputerRunMCPServer.csproj" />
+  <Project Path="src/CodexComputerRunMCPServer.Tests/CodexComputerRunMCPServer.Tests.csproj" />
+</Solution>

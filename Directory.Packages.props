@@ -6,6 +6,7 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
     <PackageVersion Include="ModelContextProtocol" Version="1.2.0" />
+    <PackageVersion Include="System.Drawing.Common" Version="10.0.0" />
     <PackageVersion Include="TUnit" Version="1.40.10" />
     <PackageVersion Include="TUnit.Assertions" Version="1.40.10" />
   </ItemGroup>

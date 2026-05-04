@@ -5,7 +5,8 @@
 Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct control over a signed-in Windows desktop session.
 It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode paste, cursor position, and visible window discovery.
 
-It is implemented in C# on `net10.0-windows10.0.19041.0` using `ModelContextProtocol` `1.2.0`.
+It is implemented in C# on `net10.0` using `ModelContextProtocol` `1.2.0`.
+The package targets plain `net10.0` so it can be distributed as a .NET tool; all desktop operations remain Windows-only through runtime guards and Win32 interop.
 
 ## Quick Install
 
@@ -40,9 +41,9 @@ This server intentionally targets Windows:
 
 | Area | Detail |
 |------|--------|
-| Target framework | `net10.0-windows10.0.19041.0` |
+| Target framework | `net10.0` |
 | Runtime guard | Exits immediately when `OperatingSystem.IsWindows()` is false |
-| Desktop APIs | `user32.dll`, `kernel32.dll`, WinForms screen metadata, GDI+ PNG capture, Windows clipboard |
+| Desktop APIs | `user32.dll`, `kernel32.dll`, GDI+ PNG capture, Windows clipboard |
 | Session requirement | Signed-in interactive Windows desktop |
 | Transport | MCP stdio |
 
@@ -184,10 +185,12 @@ Lists visible top-level Windows desktop windows as JSON.
 ## Solution Layout
 
 ```text
+CodexComputerRunMCPServer.slnx          # Root solution wrapper for CI and local pack commands
+
 src/
 |-- CodexComputerRunMCPServer/          # MCP host, tools, service layer, Win32 platform layer
 |-- CodexComputerRunMCPServer.Tests/    # TUnit unit and MCP integration tests
-`-- CodexComputerRunMCPServer.slnx      # Solution file
+`-- CodexComputerRunMCPServer.slnx      # Source solution file
 
 .mcp/
 |-- server.json                         # MCP registry/package metadata
