@@ -1,7 +1,28 @@
 <Project>
   <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
     <AnalysisLevel>latest</AnalysisLevel>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TieredPGO>true</TieredPGO>
+    <OptimizationPreference>Speed</OptimizationPreference>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <TUnitImplicitUsings>true</TUnitImplicitUsings>
+    <TUnitAssertionsImplicitUsings>true</TUnitAssertionsImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)testconfig.json">
+      <Link>$(AssemblyName).testconfig.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

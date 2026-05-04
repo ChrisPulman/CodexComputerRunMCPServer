@@ -14,5 +14,5 @@ if (-not $IsWindows) {
     throw 'CodexComputerRunMCPServer is Windows-only. Publish from Windows PowerShell.'
 }
 
-dotnet publish $Project --configuration $Configuration --runtime $Runtime --output $Output
+dotnet publish $Project --configuration $Configuration --runtime $Runtime --self-contained false --output $Output
 Write-Host "Published to $Output"

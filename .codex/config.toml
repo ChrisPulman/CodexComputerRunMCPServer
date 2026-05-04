@@ -1,0 +1,3 @@
+[mcp_servers.codex-computer-run]
+command = 'D:\Projects\Github\chrispulman\CodexComputerRunMCPServer\artifacts\publish\win-x64\CodexComputerRunMCPServer.exe'
+args = []

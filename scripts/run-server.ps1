@@ -11,4 +11,4 @@ if (-not $IsWindows) {
     throw 'CodexComputerRunMCPServer is Windows-only. Run this from Windows PowerShell.'
 }
 
-dotnet run --project $Project --configuration $Configuration
+dotnet run --project $Project --configuration $Configuration --no-launch-profile
