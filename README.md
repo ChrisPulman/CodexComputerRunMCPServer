@@ -3,7 +3,7 @@
 <!-- mcp-name: io.github.chrispulman/codex-computer-run-mcp-server -->
 
 Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct control over a signed-in Windows desktop session.
-It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode paste, cursor position, and visible window discovery.
+It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode paste, cursor position, and visible window discovery, plus a bundled Codex Skill for safe desktop-use workflows.
 
 It is implemented in C# on `net10.0` using `ModelContextProtocol` `1.2.0`.
 The package targets plain `net10.0` so it can be distributed as a .NET tool; all desktop operations remain Windows-only through runtime guards and Win32 interop.
@@ -12,9 +12,9 @@ The package targets plain `net10.0` so it can be distributed as a .NET tool; all
 
 Click to install in your preferred environment:
 
-[![VS Code - Install Codex Computer Run MCP](https://img.shields.io/badge/VS_Code-Install_Codex_Computer_Run_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=codex-computer-run-mcp-server&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22dnx%22%2C%22args%22%3A%5B%22CP.CodexComputerRun.Mcp.Server%400.%2A%22%2C%22--yes%22%5D%7D)
-[![VS Code Insiders - Install Codex Computer Run MCP](https://img.shields.io/badge/VS_Code_Insiders-Install_Codex_Computer_Run_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=codex-computer-run-mcp-server&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22dnx%22%2C%22args%22%3A%5B%22CP.CodexComputerRun.Mcp.Server%400.%2A%22%2C%22--yes%22%5D%7D&quality=insiders)
-[![Visual Studio - Install Codex Computer Run MCP](https://img.shields.io/badge/Visual_Studio-Install_Codex_Computer_Run_MCP-5C2D91?style=flat-square&logo=visualstudio&logoColor=white)](https://vs-open.link/mcp-install?%7B%22name%22%3A%22CP.CodexComputerRun.Mcp.Server%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22dnx%22%2C%22args%22%3A%5B%22CP.CodexComputerRun.Mcp.Server%400.%2A%22%2C%22--yes%22%5D%7D)
+[![VS Code - Install Codex Computer Run MCP](https://img.shields.io/badge/VS_Code-Install_Codex_Computer_Run_MCP-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=codex-computer-run-mcp-server&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22dnx%22%2C%22args%22%3A%5B%22CP.CodexComputerRun.Mcp.Server%401.%2A%22%2C%22--yes%22%5D%7D)
+[![VS Code Insiders - Install Codex Computer Run MCP](https://img.shields.io/badge/VS_Code_Insiders-Install_Codex_Computer_Run_MCP-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=codex-computer-run-mcp-server&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22dnx%22%2C%22args%22%3A%5B%22CP.CodexComputerRun.Mcp.Server%401.%2A%22%2C%22--yes%22%5D%7D&quality=insiders)
+[![Visual Studio - Install Codex Computer Run MCP](https://img.shields.io/badge/Visual_Studio-Install_Codex_Computer_Run_MCP-5C2D91?style=flat-square&logo=visualstudio&logoColor=white)](https://vs-open.link/mcp-install?%7B%22name%22%3A%22CP.CodexComputerRun.Mcp.Server%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22dnx%22%2C%22args%22%3A%5B%22CP.CodexComputerRun.Mcp.Server%401.%2A%22%2C%22--yes%22%5D%7D)
 
 Note:
 - These install links are prepared for the intended NuGet package identity `CP.CodexComputerRun.Mcp.Server`.
@@ -59,6 +59,40 @@ When this server is active, agents should follow this operating protocol:
 4. Use `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text` only when the intended foreground application is known.
 5. Prefer `type_text` for text entry because it uses Unicode clipboard paste and is faster and more reliable than simulated per-character typing.
 6. Keep screenshots small in conversation by setting `include_image` to `false` when only dimensions or a saved path are needed.
+
+## Codex Skill
+
+The repository and NuGet package include a Codex Skill at `skills/codex-computer-run`. The skill teaches Codex the observation-first workflow, safety rules, and exact MCP tool names for this server.
+
+When the packaged server starts, it tries to install the skill into the current Codex installation if `CODEX_HOME` is set or `%USERPROFILE%\.codex` already exists. Existing skill files are not overwritten during automatic install.
+
+Manual install from a globally installed tool:
+
+```powershell
+dotnet tool install --global CP.CodexComputerRun.Mcp.Server --version 1.*
+codex-computer-run-mcp-server --install-codex-skill
+```
+
+Manual install from source:
+
+```powershell
+dotnet run --project .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj -- --install-codex-skill
+```
+
+Set `CODEX_HOME` first if Codex uses a non-default location:
+
+```powershell
+$env:CODEX_HOME = "C:\Users\you\.codex"
+codex-computer-run-mcp-server --install-codex-skill
+```
+
+To refresh an existing installed copy with the packaged skill files, add `--force`.
+
+Use the skill in Codex by asking for it explicitly, for example:
+
+```text
+Use $codex-computer-run to list visible windows, take a screenshot, and confirm the active desktop state.
+```
 
 ## Available MCP Tools
 
@@ -195,6 +229,9 @@ src/
 .mcp/
 |-- server.json                         # MCP registry/package metadata
 `-- install.md                          # Manual MCP install snippets
+
+skills/
+`-- codex-computer-run/                 # Codex Skill bundled into the NuGet package
 ```
 
 ## Configuration
@@ -221,6 +258,22 @@ Published executable:
     "codex-computer-run": {
       "command": "PathTo\\CodexComputerRunMCPServer\\artifacts\\publish\\win-x64\\CodexComputerRunMCPServer.exe",
       "args": []
+    }
+  }
+}
+```
+
+NuGet package through `dnx`:
+
+```json
+{
+  "mcpServers": {
+    "codex-computer-run": {
+      "command": "dnx",
+      "args": [
+        "CP.CodexComputerRun.Mcp.Server@1.*",
+        "--yes"
+      ]
     }
   }
 }
@@ -253,6 +306,7 @@ No. They are optional convenience snippets for MCP clients that import JSON conf
 Required or primary MCP/Codex files are:
 - `.mcp/server.json` for MCP package metadata.
 - `.mcp/install.md` for install notes.
+- `skills/codex-computer-run` for the bundled Codex Skill.
 - `.codex/config.toml` for this local Codex workspace.
 - `.mcp.json` only if your client reads repository-local MCP JSON configuration.
 
@@ -282,8 +336,9 @@ dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Test
 ```
 
 Current verification:
-- 23 TUnit tests passed.
-- Coverage: 100% line coverage, 98.44% branch coverage for testable code.
+- 32 TUnit tests passed.
+- Coverage: 91.56% line coverage, 79.03% branch coverage for testable code.
+- NuGet package verification confirms `skills/codex-computer-run/SKILL.md` and `skills/codex-computer-run/agents/openai.yaml` are bundled.
 - Native Win32 P/Invoke shims are excluded from coverage and verified through the service boundary plus live MCP tool discovery.
 
 ## Publish

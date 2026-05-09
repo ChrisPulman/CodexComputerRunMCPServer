@@ -75,8 +75,23 @@ public class McpIntegrationTests
         var package = root.GetProperty("packages")[0];
 
         await Assert.That(root.GetProperty("name").GetString()).IsEqualTo("io.github.chrispulman/codex-computer-run-mcp-server");
+        await Assert.That(root.GetProperty("version").GetString()).IsEqualTo("1.0.0");
         await Assert.That(package.GetProperty("identifier").GetString()).IsEqualTo("CP.CodexComputerRun.Mcp.Server");
+        await Assert.That(package.GetProperty("version").GetString()).IsEqualTo("1.0.0");
         await Assert.That(package.GetProperty("transport").GetProperty("type").GetString()).IsEqualTo("stdio");
+    }
+
+    [Test]
+    public async Task Repository_IncludesBundledCodexSkill()
+    {
+        var skillDirectory = Path.Combine(FindRepositoryRoot(), "skills", CodexSkillInstaller.SkillName);
+        var skillFile = Path.Combine(skillDirectory, "SKILL.md");
+        var metadataFile = Path.Combine(skillDirectory, "agents", "openai.yaml");
+
+        await Assert.That(File.Exists(skillFile)).IsTrue();
+        await Assert.That(File.Exists(metadataFile)).IsTrue();
+        await Assert.That(File.ReadAllText(skillFile)).Contains("name: codex-computer-run");
+        await Assert.That(File.ReadAllText(metadataFile)).Contains("$codex-computer-run");
     }
 
     private static string FindRepositoryRoot()

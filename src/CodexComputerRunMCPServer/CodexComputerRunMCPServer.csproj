@@ -5,14 +5,14 @@
     <AssemblyName>CodexComputerRunMCPServer</AssemblyName>
     <RootNamespace>CodexComputerRunMCPServer</RootNamespace>
     <PackageId>CP.CodexComputerRun.Mcp.Server</PackageId>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Title>Codex Computer Run MCP Server</Title>
-    <Description>Windows-only MCP server for Codex desktop control: screenshots, mouse, keyboard, clipboard paste, cursor position, and visible window discovery.</Description>
+    <Description>Windows-only MCP server for Codex desktop control: screenshots, mouse, keyboard, clipboard paste, cursor position, visible window discovery, and a bundled Codex Skill.</Description>
     <Authors>Chris Pulman</Authors>
     <PackageProjectUrl>https://github.com/ChrisPulman/CodexComputerRunMCPServer</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ChrisPulman/CodexComputerRunMCPServer</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Codex;MCP;Model Context Protocol;Windows;desktop automation;computer use;dotnet</PackageTags>
+    <PackageTags>Codex;MCP;Model Context Protocol;Windows;desktop automation;computer use;skill;dotnet</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -32,5 +32,6 @@
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="" Link="README.md" />
     <None Include="..\..\.mcp\server.json" Pack="true" PackagePath=".mcp\server.json" Link=".mcp\server.json" />
+    <None Include="..\..\skills\codex-computer-run\**\*.*" Pack="true" PackagePath="tools\$(TargetFramework)\any\skills\codex-computer-run\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" LinkBase="skills\codex-computer-run" />
   </ItemGroup>
 </Project>
