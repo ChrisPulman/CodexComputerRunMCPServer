@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Computer Run"
+  short_description: "Control the Windows desktop through MCP"
+  default_prompt: "Use $codex-computer-run to inspect the desktop, list windows, and interact with Windows UI safely."

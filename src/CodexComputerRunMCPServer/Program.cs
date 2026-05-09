@@ -33,7 +33,18 @@
                 return 1;
             }
 
+            if (CodexSkillInstaller.IsInstallRequested(args))
+            {
+                var result = CodexSkillInstaller.InstallBundledSkill(
+                    createCodexHome: true,
+                    overwrite: CodexSkillInstaller.IsForceRequested(args));
+
+                Console.Error.WriteLine(result.Message);
+                return result.Success ? 0 : 1;
+            }
+
             NativeMethods.TryEnablePerMonitorDpiAwareness();
+            _ = CodexSkillInstaller.TryAutoInstall(Console.Error);
 
             using var host = CreateHost(args);
             await host.RunAsync().ConfigureAwait(false);

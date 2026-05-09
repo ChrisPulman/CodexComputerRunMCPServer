@@ -19,13 +19,21 @@ Suggested stdio config after NuGet publication:
     "codex-computer-run": {
       "command": "dnx",
       "args": [
-        "CP.CodexComputerRun.Mcp.Server@0.*",
+        "CP.CodexComputerRun.Mcp.Server@1.*",
         "--yes"
       ]
     }
   }
 }
 ```
+
+Bundled Codex Skill install:
+
+```powershell
+codex-computer-run-mcp-server --install-codex-skill
+```
+
+The server also auto-installs the bundled `codex-computer-run` skill on startup when `CODEX_HOME` is set or `%USERPROFILE%\.codex` already exists. Existing skill files are left untouched unless the installer is run with `--force`.
 
 Alternative source-run config for development:
 
