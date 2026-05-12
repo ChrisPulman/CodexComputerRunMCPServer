@@ -236,6 +236,27 @@ skills/
 
 ## Configuration
 
+### Lifecycle Safeguards
+
+The server enforces one active desktop-control instance per Windows user profile by taking an exclusive lock at:
+
+```text
+%LOCALAPPDATA%\CodexComputerRunMCPServer\server.lock
+```
+
+If another instance is already running, startup exits with code `2` before exposing MCP tools. This prevents multiple agents from sending mouse, keyboard, and clipboard input to the same desktop at the same time.
+
+The server also shuts itself down after `5` minutes without MCP tool activity. Every tool call updates activity state and active calls are never stopped mid-invocation.
+
+Optional environment overrides:
+
+| Variable | Default | Detail |
+|----------|---------|--------|
+| `CODEX_COMPUTER_RUN_SINGLE_INSTANCE` | `true` | Set `false` to disable the single-instance lock. |
+| `CODEX_COMPUTER_RUN_IDLE_SHUTDOWN` | `true` | Set `false` to disable idle shutdown. |
+| `CODEX_COMPUTER_RUN_IDLE_TIMEOUT_SECONDS` | `300` | Seconds without tool activity before shutdown. Values `0` or lower disable idle shutdown. |
+| `CODEX_COMPUTER_RUN_IDLE_CHECK_INTERVAL_SECONDS` | `10` | Seconds between idle checks. |
+
 ### Fast Codex Desktop Configuration
 
 After publishing, Codex can launch the optimized executable directly:
@@ -336,8 +357,8 @@ dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Test
 ```
 
 Current verification:
-- 32 TUnit tests passed.
-- Coverage: 91.56% line coverage, 79.03% branch coverage for testable code.
+- 37 TUnit tests passed.
+- Coverage: 87.50% line coverage, 66.16% branch coverage for testable code.
 - NuGet package verification confirms `skills/codex-computer-run/SKILL.md` and `skills/codex-computer-run/agents/openai.yaml` are bundled.
 - Native Win32 P/Invoke shims are excluded from coverage and verified through the service boundary plus live MCP tool discovery.
 

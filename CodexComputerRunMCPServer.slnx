@@ -1,4 +1,8 @@
 <Solution>
   <Project Path="src/CodexComputerRunMCPServer/CodexComputerRunMCPServer.csproj" />
+  <Folder Name="/Config/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+  </Folder>
   <Project Path="src/CodexComputerRunMCPServer.Tests/CodexComputerRunMCPServer.Tests.csproj" />
 </Solution>

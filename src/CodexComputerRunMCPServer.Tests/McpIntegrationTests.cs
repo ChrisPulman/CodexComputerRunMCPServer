@@ -17,6 +17,7 @@ public class McpIntegrationTests
         var hostedServices = host.Services.GetServices<IHostedService>();
 
         await Assert.That(hostedServices.Any()).IsTrue();
+        await Assert.That(hostedServices.OfType<IdleShutdownService>().Any()).IsTrue();
     }
 
     [Test]
@@ -75,9 +76,9 @@ public class McpIntegrationTests
         var package = root.GetProperty("packages")[0];
 
         await Assert.That(root.GetProperty("name").GetString()).IsEqualTo("io.github.chrispulman/codex-computer-run-mcp-server");
-        await Assert.That(root.GetProperty("version").GetString()).IsEqualTo("1.0.0");
+        await Assert.That(root.GetProperty("version").GetString()).IsEqualTo("1.0.1");
         await Assert.That(package.GetProperty("identifier").GetString()).IsEqualTo("CP.CodexComputerRun.Mcp.Server");
-        await Assert.That(package.GetProperty("version").GetString()).IsEqualTo("1.0.0");
+        await Assert.That(package.GetProperty("version").GetString()).IsEqualTo("1.0.1");
         await Assert.That(package.GetProperty("transport").GetProperty("type").GetString()).IsEqualTo("stdio");
     }
 
