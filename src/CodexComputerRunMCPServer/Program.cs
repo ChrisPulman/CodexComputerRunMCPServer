@@ -1,81 +1,95 @@
-    using System.Diagnostics.CodeAnalysis;
-    using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.Extensions.Hosting;
-    using Microsoft.Extensions.Logging;
-    using ModelContextProtocol.Server;
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Server;
 
-    namespace CodexComputerRunMCPServer;
+namespace CodexComputerRunMCPServer;
+
+/// <summary>
+/// Provides application startup and host configuration for the MCP server process.
+/// </summary>
+public static class Program
+{
+    /// <summary>
+    /// Application entry point.
+    /// </summary>
+    /// <param name="args">Command-line arguments passed to the process.</param>
+    /// <returns>
+    /// A task that resolves to an exit code:
+    /// <c>0</c> when the server exits normally; <c>1</c> when startup is rejected
+    /// because the current operating system is not Windows; <c>2</c> when another
+    /// server instance already owns the desktop-control lock.
+    /// </returns>
+    /// <remarks>
+    /// This server is supported only in a signed-in Windows desktop session.
+    /// The method also enables per-monitor DPI awareness before creating and running the host.
+    /// </remarks>
+    [ExcludeFromCodeCoverage]
+    public static async Task<int> Main(string[] args)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Console.Error.WriteLine("CodexComputerRunMCPServer is Windows-only. Run it from a signed-in Windows desktop session.");
+            return 1;
+        }
+
+        if (CodexSkillInstaller.IsInstallRequested(args))
+        {
+            var result = CodexSkillInstaller.InstallBundledSkill(
+                createCodexHome: true,
+                overwrite: CodexSkillInstaller.IsForceRequested(args));
+
+            Console.Error.WriteLine(result.Message);
+            return result.Success ? 0 : 1;
+        }
+
+        var lifecycleOptions = ComputerRunLifecycleOptions.FromEnvironment();
+        using var instanceGuard = SingleInstanceGuard.TryAcquire(lifecycleOptions.SingleInstanceEnabled);
+        if (!instanceGuard.HasOwnership)
+        {
+            Console.Error.WriteLine(
+                "Another CodexComputerRunMCPServer instance is already running. " +
+                "Only one computer-control MCP server can own the desktop at a time.");
+            return SingleInstanceGuard.ConcurrentInstanceExitCode;
+        }
+
+        NativeMethods.TryEnablePerMonitorDpiAwareness();
+        _ = CodexSkillInstaller.TryAutoInstall(Console.Error);
+
+        using var host = CreateHost(args);
+        await host.RunAsync().ConfigureAwait(false);
+        return 0;
+    }
 
     /// <summary>
-    /// Provides application startup and host configuration for the MCP server process.
+    /// Creates and configures the application host used by the MCP server.
     /// </summary>
-    public static class Program
+    /// <param name="args">Command-line arguments used to initialize the host builder.</param>
+    /// <returns>A fully configured <see cref="IHost"/> instance.</returns>
+    /// <remarks>
+    /// Logging providers are reset and console logging is directed to standard error so that
+    /// standard output remains reserved for MCP JSON-RPC stdio transport traffic.
+    /// </remarks>
+    public static IHost CreateHost(string[] args)
     {
-        /// <summary>
-        /// Application entry point.
-        /// </summary>
-        /// <param name="args">Command-line arguments passed to the process.</param>
-        /// <returns>
-        /// A task that resolves to an exit code:
-        /// <c>0</c> when the server exits normally; <c>1</c> when startup is rejected
-        /// because the current operating system is not Windows.
-        /// </returns>
-        /// <remarks>
-        /// This server is supported only in a signed-in Windows desktop session.
-        /// The method also enables per-monitor DPI awareness before creating and running the host.
-        /// </remarks>
-        [ExcludeFromCodeCoverage]
-        public static async Task<int> Main(string[] args)
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole(options =>
         {
-            if (!OperatingSystem.IsWindows())
-            {
-                Console.Error.WriteLine("CodexComputerRunMCPServer is Windows-only. Run it from a signed-in Windows desktop session.");
-                return 1;
-            }
+            // MCP stdio reserves stdout for JSON-RPC. Diagnostics must go to stderr.
+            options.LogToStandardErrorThreshold = LogLevel.Trace;
+        });
 
-            if (CodexSkillInstaller.IsInstallRequested(args))
-            {
-                var result = CodexSkillInstaller.InstallBundledSkill(
-                    createCodexHome: true,
-                    overwrite: CodexSkillInstaller.IsForceRequested(args));
+        builder.Services.AddSingleton(_ => ComputerRunLifecycleOptions.FromConfiguration(builder.Configuration));
+        builder.Services.AddHostedService<IdleShutdownService>();
 
-                Console.Error.WriteLine(result.Message);
-                return result.Success ? 0 : 1;
-            }
+        builder.Services
+            .AddMcpServer()
+            .WithStdioServerTransport()
+            .WithToolsFromAssembly();
 
-            NativeMethods.TryEnablePerMonitorDpiAwareness();
-            _ = CodexSkillInstaller.TryAutoInstall(Console.Error);
-
-            using var host = CreateHost(args);
-            await host.RunAsync().ConfigureAwait(false);
-            return 0;
-        }
-
-        /// <summary>
-        /// Creates and configures the application host used by the MCP server.
-        /// </summary>
-        /// <param name="args">Command-line arguments used to initialize the host builder.</param>
-        /// <returns>A fully configured <see cref="IHost"/> instance.</returns>
-        /// <remarks>
-        /// Logging providers are reset and console logging is directed to standard error so that
-        /// standard output remains reserved for MCP JSON-RPC stdio transport traffic.
-        /// </remarks>
-        public static IHost CreateHost(string[] args)
-        {
-            var builder = Host.CreateApplicationBuilder(args);
-
-            builder.Logging.ClearProviders();
-            builder.Logging.AddConsole(options =>
-            {
-                // MCP stdio reserves stdout for JSON-RPC. Diagnostics must go to stderr.
-                options.LogToStandardErrorThreshold = LogLevel.Trace;
-            });
-
-            builder.Services
-                .AddMcpServer()
-                .WithStdioServerTransport()
-                .WithToolsFromAssembly();
-
-            return builder.Build();
-        }
+        return builder.Build();
     }
+}

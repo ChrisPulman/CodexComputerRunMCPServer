@@ -32,7 +32,7 @@ public static class ComputerRunTools
     public static CallToolResult screenshot(
         [Description("Optional output PNG path. If omitted, no temporary file is created.")] string? path = null,
         [Description("Include PNG image data in the MCP tool result.")] bool include_image = true)
-        => ComputerRunToolRuntime.Service.Screenshot(path, include_image);
+        => Invoke(service => service.Screenshot(path, include_image));
 
     /// <summary>
     /// Moves the mouse cursor to absolute virtual-screen coordinates.
@@ -47,7 +47,7 @@ public static class ComputerRunTools
         [Description("Absolute X coordinate.")] int x,
         [Description("Absolute Y coordinate.")] int y,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => ComputerRunToolRuntime.Service.MoveMouse(x, y, delay);
+        => Invoke(service => service.MoveMouse(x, y, delay));
 
     /// <summary>
     /// Performs a mouse click at the current cursor position or at provided coordinates.
@@ -68,7 +68,7 @@ public static class ComputerRunTools
         [Description("Number of clicks.")] int clicks = 1,
         [Description("Delay between repeated clicks, in seconds.")] double interval = 0.08,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => ComputerRunToolRuntime.Service.Click(x, y, button, clicks, interval, delay);
+        => Invoke(service => service.Click(x, y, button, clicks, interval, delay));
 
     /// <summary>
     /// Scrolls the mouse wheel, optionally after moving to specified coordinates.
@@ -85,7 +85,7 @@ public static class ComputerRunTools
         [Description("Optional absolute X coordinate to move to before scrolling.")] int? x = null,
         [Description("Optional absolute Y coordinate to move to before scrolling.")] int? y = null,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => ComputerRunToolRuntime.Service.Scroll(amount, x, y, delay);
+        => Invoke(service => service.Scroll(amount, x, y, delay));
 
     /// <summary>
     /// Presses and releases a single keyboard key.
@@ -100,7 +100,7 @@ public static class ComputerRunTools
         [Description("Key name or single character.")] string key,
         [Description("How long to hold the key, in seconds.")] double duration = 0.03,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => ComputerRunToolRuntime.Service.PressKey(key, duration, delay);
+        => Invoke(service => service.PressKey(key, duration, delay));
 
     /// <summary>
     /// Presses a keyboard shortcut chord such as <c>ctrl+l</c> or <c>ctrl+shift+escape</c>.
@@ -113,7 +113,7 @@ public static class ComputerRunTools
     public static string hotkey(
         [Description("Shortcut text. Use +, comma, or space separators, e.g. ctrl+shift+escape.")] string keys,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => ComputerRunToolRuntime.Service.Hotkey(keys, delay);
+        => Invoke(service => service.Hotkey(keys, delay));
 
     /// <summary>
     /// Pastes Unicode text into the currently focused Windows application via clipboard and Ctrl+V.
@@ -126,7 +126,7 @@ public static class ComputerRunTools
     public static string type_text(
         [Description("Text to paste into the focused application.")] string text,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => ComputerRunToolRuntime.Service.TypeText(text, delay);
+        => Invoke(service => service.TypeText(text, delay));
 
     /// <summary>
     /// Gets the current cursor position.
@@ -135,7 +135,7 @@ public static class ComputerRunTools
     [McpServerTool]
     [Description("Return the current Windows cursor position as JSON.")]
     public static string cursor_position()
-        => ComputerRunToolRuntime.Service.CursorPosition();
+        => Invoke(service => service.CursorPosition());
 
     /// <summary>
     /// Lists visible top-level desktop windows.
@@ -145,5 +145,12 @@ public static class ComputerRunTools
     [McpServerTool]
     [Description("List visible top-level Windows desktop windows as JSON.")]
     public static string list_windows([Description("Maximum number of windows to return.")] int limit = 50)
-        => ComputerRunToolRuntime.Service.ListWindows(limit);
+        => Invoke(service => service.ListWindows(limit));
+
+    private static TResult Invoke<TResult>(Func<IComputerRunService, TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        return action(ComputerRunToolRuntime.Service);
+    }
 }
