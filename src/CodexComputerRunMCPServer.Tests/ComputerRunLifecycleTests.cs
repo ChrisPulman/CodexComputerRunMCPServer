@@ -42,7 +42,11 @@ public class ComputerRunLifecycleTests
     [Test]
     public async Task IdleShutdown_StopsOnlyWhenNoActiveInvocationsExceedTimeout()
     {
-        var options = ComputerRunLifecycleOptions.Default with { IdleTimeout = TimeSpan.FromMinutes(5) };
+        var options = ComputerRunLifecycleOptions.Default with
+        {
+            IdleShutdownEnabled = true,
+            IdleTimeout = TimeSpan.FromMinutes(5)
+        };
         var now = new DateTimeOffset(2026, 5, 12, 12, 10, 0, TimeSpan.Zero);
         var idleSnapshot = new ComputerRunActivitySnapshot(now - TimeSpan.FromMinutes(5), ActiveInvocations: 0);
         var activeSnapshot = new ComputerRunActivitySnapshot(now - TimeSpan.FromMinutes(30), ActiveInvocations: 1);
@@ -51,6 +55,16 @@ public class ComputerRunLifecycleTests
         await Assert.That(IdleShutdownService.ShouldStopForIdle(options, idleSnapshot, now)).IsTrue();
         await Assert.That(IdleShutdownService.ShouldStopForIdle(options, activeSnapshot, now)).IsFalse();
         await Assert.That(IdleShutdownService.ShouldStopForIdle(options, recentSnapshot, now)).IsFalse();
+    }
+
+    [Test]
+    public async Task LifecycleOptions_DefaultKeepsLongLivedMcpTransportsOpen()
+    {
+        var options = ComputerRunLifecycleOptions.Default;
+
+        await Assert.That(options.SingleInstanceEnabled).IsTrue();
+        await Assert.That(options.IdleShutdownEnabled).IsFalse();
+        await Assert.That(options.IdleTimeout).IsEqualTo(ComputerRunLifecycleOptions.DefaultIdleTimeout);
     }
 
     [Test]

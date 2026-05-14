@@ -246,15 +246,15 @@ The server enforces one active desktop-control instance per Windows user profile
 
 If another instance is already running, startup exits with code `2` before exposing MCP tools. This prevents multiple agents from sending mouse, keyboard, and clipboard input to the same desktop at the same time.
 
-The server also shuts itself down after `5` minutes without MCP tool activity. Every tool call updates activity state and active calls are never stopped mid-invocation.
+Idle shutdown is disabled by default so long-lived Codex sessions can call the MCP tools later without finding a closed stdio transport. If you explicitly enable idle shutdown, every tool call updates activity state and active calls are never stopped mid-invocation.
 
 Optional environment overrides:
 
 | Variable | Default | Detail |
 |----------|---------|--------|
 | `CODEX_COMPUTER_RUN_SINGLE_INSTANCE` | `true` | Set `false` to disable the single-instance lock. |
-| `CODEX_COMPUTER_RUN_IDLE_SHUTDOWN` | `true` | Set `false` to disable idle shutdown. |
-| `CODEX_COMPUTER_RUN_IDLE_TIMEOUT_SECONDS` | `300` | Seconds without tool activity before shutdown. Values `0` or lower disable idle shutdown. |
+| `CODEX_COMPUTER_RUN_IDLE_SHUTDOWN` | `false` | Set `true` to enable idle shutdown. |
+| `CODEX_COMPUTER_RUN_IDLE_TIMEOUT_SECONDS` | `300` | Seconds without tool activity before shutdown when idle shutdown is enabled. Values `0` or lower disable idle shutdown. |
 | `CODEX_COMPUTER_RUN_IDLE_CHECK_INTERVAL_SECONDS` | `10` | Seconds between idle checks. |
 
 ### Fast Codex Desktop Configuration
