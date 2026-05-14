@@ -31,7 +31,7 @@ internal sealed record ComputerRunLifecycleOptions(
     /// </summary>
     public static ComputerRunLifecycleOptions Default { get; } = new(
         SingleInstanceEnabled: true,
-        IdleShutdownEnabled: true,
+        IdleShutdownEnabled: false,
         IdleTimeout: DefaultIdleTimeout,
         IdleCheckInterval: DefaultIdleCheckInterval);
 
