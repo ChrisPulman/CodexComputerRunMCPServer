@@ -6,16 +6,23 @@ namespace CodexComputerRunMCPServer;
 /// <summary>
 /// Configures process lifecycle safeguards for the computer run MCP server.
 /// </summary>
-/// <param name="SingleInstanceEnabled">Whether startup should reject concurrent server instances.</param>
+/// <param name="ControlLockEnabled">Whether desktop-control actions should be coordinated across server instances.</param>
+/// <param name="ControlLeaseDuration">How long a server keeps desktop control after its latest control action.</param>
 /// <param name="IdleShutdownEnabled">Whether the host should stop after a period without tool activity.</param>
 /// <param name="IdleTimeout">How long the server may remain unused before it shuts down.</param>
 /// <param name="IdleCheckInterval">How often idle state is checked.</param>
 internal sealed record ComputerRunLifecycleOptions(
-    bool SingleInstanceEnabled,
+    bool ControlLockEnabled,
+    TimeSpan ControlLeaseDuration,
     bool IdleShutdownEnabled,
     TimeSpan IdleTimeout,
     TimeSpan IdleCheckInterval)
 {
+    /// <summary>
+    /// Default time a session keeps desktop-control ownership after its latest input-changing action.
+    /// </summary>
+    public static readonly TimeSpan DefaultControlLeaseDuration = TimeSpan.FromSeconds(60);
+
     /// <summary>
     /// Default time without MCP tool use before the server stops itself.
     /// </summary>
@@ -30,7 +37,8 @@ internal sealed record ComputerRunLifecycleOptions(
     /// Gets the default lifecycle options.
     /// </summary>
     public static ComputerRunLifecycleOptions Default { get; } = new(
-        SingleInstanceEnabled: true,
+        ControlLockEnabled: true,
+        ControlLeaseDuration: DefaultControlLeaseDuration,
         IdleShutdownEnabled: false,
         IdleTimeout: DefaultIdleTimeout,
         IdleCheckInterval: DefaultIdleCheckInterval);
@@ -44,11 +52,17 @@ internal sealed record ComputerRunLifecycleOptions(
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var singleInstanceEnabled = ReadBoolean(
+        var controlLockEnabled = ReadBoolean(
             configuration,
-            "SingleInstanceEnabled",
-            "CODEX_COMPUTER_RUN_SINGLE_INSTANCE",
-            Default.SingleInstanceEnabled);
+            "ControlLockEnabled",
+            "CODEX_COMPUTER_RUN_CONTROL_LOCK",
+            Default.ControlLockEnabled);
+
+        var controlLeaseDuration = ReadSeconds(
+            configuration,
+            "ControlLeaseSeconds",
+            "CODEX_COMPUTER_RUN_CONTROL_LEASE_SECONDS",
+            Default.ControlLeaseDuration);
 
         var idleShutdownEnabled = ReadBoolean(
             configuration,
@@ -79,7 +93,8 @@ internal sealed record ComputerRunLifecycleOptions(
         }
 
         return new ComputerRunLifecycleOptions(
-            singleInstanceEnabled,
+            controlLockEnabled,
+            controlLeaseDuration < TimeSpan.Zero ? Default.ControlLeaseDuration : controlLeaseDuration,
             idleShutdownEnabled,
             idleTimeout,
             idleCheckInterval);

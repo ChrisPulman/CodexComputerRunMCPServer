@@ -18,8 +18,7 @@ public static class Program
     /// <returns>
     /// A task that resolves to an exit code:
     /// <c>0</c> when the server exits normally; <c>1</c> when startup is rejected
-    /// because the current operating system is not Windows; <c>2</c> when another
-    /// server instance already owns the desktop-control lock.
+    /// because the current operating system is not Windows.
     /// </returns>
     /// <remarks>
     /// This server is supported only in a signed-in Windows desktop session.
@@ -42,16 +41,6 @@ public static class Program
 
             Console.Error.WriteLine(result.Message);
             return result.Success ? 0 : 1;
-        }
-
-        var lifecycleOptions = ComputerRunLifecycleOptions.FromEnvironment();
-        using var instanceGuard = SingleInstanceGuard.TryAcquire(lifecycleOptions.SingleInstanceEnabled);
-        if (!instanceGuard.HasOwnership)
-        {
-            Console.Error.WriteLine(
-                "Another CodexComputerRunMCPServer instance is already running. " +
-                "Only one computer-control MCP server can own the desktop at a time.");
-            return SingleInstanceGuard.ConcurrentInstanceExitCode;
         }
 
         NativeMethods.TryEnablePerMonitorDpiAwareness();
@@ -82,7 +71,10 @@ public static class Program
             options.LogToStandardErrorThreshold = LogLevel.Trace;
         });
 
-        builder.Services.AddSingleton(_ => ComputerRunLifecycleOptions.FromConfiguration(builder.Configuration));
+        var lifecycleOptions = ComputerRunLifecycleOptions.FromConfiguration(builder.Configuration);
+        ComputerRunToolRuntime.ConfigureControlLease(DesktopControlLease.FromOptions(lifecycleOptions));
+
+        builder.Services.AddSingleton(_ => lifecycleOptions);
         builder.Services.AddHostedService<IdleShutdownService>();
 
         builder.Services
