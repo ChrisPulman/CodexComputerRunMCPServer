@@ -8,6 +8,7 @@ internal static class ComputerRunToolRuntime
 {
     private static IComputerRunService _service = ComputerRunService.CreateDefault();
     private static ComputerRunActivityTracker _activityTracker = new();
+    private static DesktopControlLease _controlLease = DesktopControlLease.FromOptions(ComputerRunLifecycleOptions.Default);
 
     /// <summary>
     /// Gets the current <see cref="IComputerRunService"/> instance using a volatile read
@@ -21,10 +22,21 @@ internal static class ComputerRunToolRuntime
     public static ComputerRunActivityTracker ActivityTracker => Volatile.Read(ref _activityTracker);
 
     /// <summary>
+    /// Gets the desktop-control lease used to coordinate input-changing tool calls.
+    /// </summary>
+    public static DesktopControlLease ControlLease => Volatile.Read(ref _controlLease);
+
+    /// <summary>
     /// Starts tracking a tool invocation until the returned scope is disposed.
     /// </summary>
     /// <returns>An invocation scope that must be disposed when the tool call completes.</returns>
     public static IDisposable BeginToolInvocation() => ActivityTracker.BeginInvocation();
+
+    /// <summary>
+    /// Starts a desktop-control operation, acquiring or renewing exclusive control ownership.
+    /// </summary>
+    /// <returns>An invocation scope that must be disposed when the control operation completes.</returns>
+    public static IDisposable BeginDesktopControlInvocation() => ControlLease.BeginControlInvocation();
 
     /// <summary>
     /// Replaces the current <see cref="IComputerRunService"/> with the specified instance
@@ -62,6 +74,37 @@ internal static class ComputerRunToolRuntime
     }
 
     /// <summary>
+    /// Replaces the current desktop-control lease.
+    /// </summary>
+    /// <param name="controlLease">The control lease to use.</param>
+    internal static void ConfigureControlLease(DesktopControlLease controlLease)
+    {
+        ArgumentNullException.ThrowIfNull(controlLease);
+        var previous = Interlocked.Exchange(ref _controlLease, controlLease);
+        if (!ReferenceEquals(previous, controlLease))
+        {
+            previous.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Replaces the current desktop-control lease for the duration of a test.
+    /// </summary>
+    /// <param name="controlLease">The test control lease to use.</param>
+    /// <returns>
+    /// An <see cref="IDisposable"/> that, when disposed, restores the previous lease.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="controlLease"/> is <see langword="null"/>.
+    /// </exception>
+    internal static IDisposable ReplaceControlLeaseForTests(DesktopControlLease controlLease)
+    {
+        ArgumentNullException.ThrowIfNull(controlLease);
+        var previous = Interlocked.Exchange(ref _controlLease, controlLease);
+        return new RestoreControlLease(controlLease, previous);
+    }
+
+    /// <summary>
     /// Restores a previously held <see cref="IComputerRunService"/> instance when disposed.
     /// </summary>
     private sealed class RestoreService(IComputerRunService previous) : IDisposable
@@ -85,6 +128,25 @@ internal static class ComputerRunToolRuntime
         public void Dispose()
         {
             _ = Interlocked.CompareExchange(ref _activityTracker, previous, current);
+        }
+    }
+
+    /// <summary>
+    /// Restores a previously held <see cref="DesktopControlLease"/> instance when disposed.
+    /// </summary>
+    private sealed class RestoreControlLease(
+        DesktopControlLease current,
+        DesktopControlLease previous) : IDisposable
+    {
+        /// <summary>
+        /// Restores the previous <see cref="DesktopControlLease"/> instance in a thread-safe manner.
+        /// </summary>
+        public void Dispose()
+        {
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _controlLease, previous, current), current))
+            {
+                current.Dispose();
+            }
         }
     }
 }

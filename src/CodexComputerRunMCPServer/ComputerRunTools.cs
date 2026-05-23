@@ -47,7 +47,7 @@ public static class ComputerRunTools
         [Description("Absolute X coordinate.")] int x,
         [Description("Absolute Y coordinate.")] int y,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => Invoke(service => service.MoveMouse(x, y, delay));
+        => InvokeControl(service => service.MoveMouse(x, y, delay));
 
     /// <summary>
     /// Performs a mouse click at the current cursor position or at provided coordinates.
@@ -68,7 +68,7 @@ public static class ComputerRunTools
         [Description("Number of clicks.")] int clicks = 1,
         [Description("Delay between repeated clicks, in seconds.")] double interval = 0.08,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => Invoke(service => service.Click(x, y, button, clicks, interval, delay));
+        => InvokeControl(service => service.Click(x, y, button, clicks, interval, delay));
 
     /// <summary>
     /// Scrolls the mouse wheel, optionally after moving to specified coordinates.
@@ -85,7 +85,7 @@ public static class ComputerRunTools
         [Description("Optional absolute X coordinate to move to before scrolling.")] int? x = null,
         [Description("Optional absolute Y coordinate to move to before scrolling.")] int? y = null,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => Invoke(service => service.Scroll(amount, x, y, delay));
+        => InvokeControl(service => service.Scroll(amount, x, y, delay));
 
     /// <summary>
     /// Presses and releases a single keyboard key.
@@ -100,7 +100,7 @@ public static class ComputerRunTools
         [Description("Key name or single character.")] string key,
         [Description("How long to hold the key, in seconds.")] double duration = 0.03,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => Invoke(service => service.PressKey(key, duration, delay));
+        => InvokeControl(service => service.PressKey(key, duration, delay));
 
     /// <summary>
     /// Presses a keyboard shortcut chord such as <c>ctrl+l</c> or <c>ctrl+shift+escape</c>.
@@ -113,7 +113,7 @@ public static class ComputerRunTools
     public static string hotkey(
         [Description("Shortcut text. Use +, comma, or space separators, e.g. ctrl+shift+escape.")] string keys,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => Invoke(service => service.Hotkey(keys, delay));
+        => InvokeControl(service => service.Hotkey(keys, delay));
 
     /// <summary>
     /// Pastes Unicode text into the currently focused Windows application via clipboard and Ctrl+V.
@@ -126,7 +126,7 @@ public static class ComputerRunTools
     public static string type_text(
         [Description("Text to paste into the focused application.")] string text,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => Invoke(service => service.TypeText(text, delay));
+        => InvokeControl(service => service.TypeText(text, delay));
 
     /// <summary>
     /// Gets the current cursor position.
@@ -151,6 +151,14 @@ public static class ComputerRunTools
     {
         ArgumentNullException.ThrowIfNull(action);
         using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        return action(ComputerRunToolRuntime.Service);
+    }
+
+    private static TResult InvokeControl<TResult>(Func<IComputerRunService, TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        using var control = ComputerRunToolRuntime.BeginDesktopControlInvocation();
         return action(ComputerRunToolRuntime.Service);
     }
 }

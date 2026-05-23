@@ -13,6 +13,7 @@ public class McpIntegrationTests
     [Test]
     public async Task Host_CreatesMcpHostedService()
     {
+        using var runtimeLock = await RuntimeMutationLock.AcquireAsync();
         using var host = Program.CreateHost([]);
         var hostedServices = host.Services.GetServices<IHostedService>();
 
@@ -51,8 +52,11 @@ public class McpIntegrationTests
     [Test]
     public async Task StaticToolFacade_DelegatesToRuntimeService()
     {
+        using var runtimeLock = await RuntimeMutationLock.AcquireAsync();
         var service = new TestComputerRunService();
         using var restore = ComputerRunToolRuntime.ReplaceServiceForTests(service);
+        using var restoreLease = ComputerRunToolRuntime.ReplaceControlLeaseForTests(
+            new DesktopControlLease(enabled: false, TimeSpan.Zero));
 
         _ = ComputerRunTools.move_mouse(1, 2);
         _ = ComputerRunTools.click(button: "middle");

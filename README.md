@@ -238,13 +238,15 @@ skills/
 
 ### Lifecycle Safeguards
 
-The server enforces one active desktop-control instance per Windows user profile by taking an exclusive lock at:
+The server allows multiple Codex sessions to start their own MCP server process so tool discovery remains available in each session. Input-changing tools still coordinate desktop control by taking an exclusive, renewable lease at:
 
 ```text
-%LOCALAPPDATA%\CodexComputerRunMCPServer\server.lock
+%LOCALAPPDATA%\CodexComputerRunMCPServer\control.lock
 ```
 
-If another instance is already running, startup exits with code `2` before exposing MCP tools. This prevents multiple agents from sending mouse, keyboard, and clipboard input to the same desktop at the same time.
+The control lease is acquired by `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`. If another Codex session currently owns the lease, the tool call fails with a busy message instead of allowing simultaneous mouse, keyboard, or clipboard input. Observation tools (`screenshot`, `cursor_position`, and `list_windows`) remain available from every session.
+
+After the latest control action, the owning process keeps the lease briefly so follow-up clicks or keystrokes from the same session are not interleaved with another session. The lease is also released immediately when the owning MCP process exits.
 
 Idle shutdown is disabled by default so long-lived Codex sessions can call the MCP tools later without finding a closed stdio transport. If you explicitly enable idle shutdown, every tool call updates activity state and active calls are never stopped mid-invocation.
 
@@ -252,7 +254,8 @@ Optional environment overrides:
 
 | Variable | Default | Detail |
 |----------|---------|--------|
-| `CODEX_COMPUTER_RUN_SINGLE_INSTANCE` | `true` | Set `false` to disable the single-instance lock. |
+| `CODEX_COMPUTER_RUN_CONTROL_LOCK` | `true` | Set `false` to disable cross-session desktop-control coordination. |
+| `CODEX_COMPUTER_RUN_CONTROL_LEASE_SECONDS` | `60` | Seconds the owning session keeps desktop control after the latest input-changing action. Set `0` to release immediately after each action. |
 | `CODEX_COMPUTER_RUN_IDLE_SHUTDOWN` | `false` | Set `true` to enable idle shutdown. |
 | `CODEX_COMPUTER_RUN_IDLE_TIMEOUT_SECONDS` | `300` | Seconds without tool activity before shutdown when idle shutdown is enabled. Values `0` or lower disable idle shutdown. |
 | `CODEX_COMPUTER_RUN_IDLE_CHECK_INTERVAL_SECONDS` | `10` | Seconds between idle checks. |
@@ -353,12 +356,12 @@ dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Test
 Coverage with TUnit/Microsoft Testing Platform:
 
 ```powershell
-dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release -- --coverage --coverage-output .\artifacts\test-results\coverage.cobertura.xml --coverage-output-format cobertura --results-directory .\artifacts\test-results
+dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release -- --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura --results-directory .\artifacts\test-results
 ```
 
 Current verification:
-- 37 TUnit tests passed.
-- Coverage: 87.50% line coverage, 66.16% branch coverage for testable code.
+- 40 TUnit tests passed.
+- Coverage: 89.09% line coverage, 69.01% branch coverage for testable code.
 - NuGet package verification confirms `skills/codex-computer-run/SKILL.md` and `skills/codex-computer-run/agents/openai.yaml` are bundled.
 - Native Win32 P/Invoke shims are excluded from coverage and verified through the service boundary plus live MCP tool discovery.
 
