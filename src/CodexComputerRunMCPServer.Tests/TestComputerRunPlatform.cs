@@ -4,7 +4,7 @@ namespace CodexComputerRunMCPServer.Tests;
 
 internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 {
-    public bool IsWindows { get; set; } = true;
+    public string PlatformName { get; set; } = "Test";
 
     public Rectangle Bounds { get; set; } = new(10, 20, 640, 480);
 
@@ -22,7 +22,7 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public List<byte[]> Hotkeys { get; } = [];
 
-    public List<string> ClipboardTexts { get; } = [];
+    public List<string> PastedTexts { get; } = [];
 
     public List<Rectangle> Captures { get; } = [];
 
@@ -70,7 +70,7 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public void PressHotkey(IReadOnlyList<byte> virtualKeys) => Hotkeys.Add(virtualKeys.ToArray());
 
-    public void SetClipboardText(string text) => ClipboardTexts.Add(text);
+    public void PasteText(string text) => PastedTexts.Add(text);
 
     public IReadOnlyList<WindowInfo> ListWindows(int limit) => Windows.Take(limit).ToArray();
 

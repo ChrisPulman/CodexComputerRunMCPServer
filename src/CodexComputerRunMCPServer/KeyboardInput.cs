@@ -1,7 +1,7 @@
 namespace CodexComputerRunMCPServer;
 
 /// <summary>
-/// Provides helpers to parse human-readable key input strings and resolve them to Windows virtual-key sequences.
+/// Provides helpers to parse human-readable key input strings and resolve them to Windows-style virtual-key sequences.
 /// </summary>
 internal static class KeyboardInput
 {

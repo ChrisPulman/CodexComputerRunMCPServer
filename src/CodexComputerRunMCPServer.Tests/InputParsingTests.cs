@@ -51,15 +51,10 @@ public class InputParsingTests
     [Test]
     public async Task Parsers_RejectInvalidInput()
     {
-        var badMouse = Throws<ArgumentException>(() => MouseButtonParser.Parse("extra"));
-        var badKey = Throws<ArgumentException>(() => KeyboardInput.ResolveKeyChord("unknown-key", _ => -1));
-        var emptyHotkey = Throws<ArgumentException>(() => KeyboardInput.ResolveHotkey("+,", _ => -1));
-        var badDelay = Throws<ArgumentOutOfRangeException>(() => Delay.FromSeconds(double.NaN, "bad"));
-
-        await Assert.That(badMouse).IsTrue();
-        await Assert.That(badKey).IsTrue();
-        await Assert.That(emptyHotkey).IsTrue();
-        await Assert.That(badDelay).IsTrue();
+        await Assert.That(() => MouseButtonParser.Parse("extra")).Throws<ArgumentException>();
+        await Assert.That(() => KeyboardInput.ResolveKeyChord("unknown-key", _ => -1)).Throws<ArgumentException>();
+        await Assert.That(() => KeyboardInput.ResolveHotkey("+,", _ => -1)).Throws<ArgumentException>();
+        await Assert.That(() => Delay.FromSeconds(double.NaN, "bad")).Throws<ArgumentOutOfRangeException>();
     }
 
     [Test]
@@ -79,19 +74,5 @@ public class InputParsingTests
         Delay.Sleep(0.001);
 
         await Assert.That(DateTimeOffset.UtcNow >= started).IsTrue();
-    }
-
-    private static bool Throws<TException>(Action action)
-        where TException : Exception
-    {
-        try
-        {
-            action();
-            return false;
-        }
-        catch (TException)
-        {
-            return true;
-        }
     }
 }

@@ -2,11 +2,11 @@
 
 <!-- mcp-name: io.github.chrispulman/codex-computer-run-mcp-server -->
 
-Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct control over a signed-in Windows desktop session.
+Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct control over a signed-in desktop session.
 It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode paste, cursor position, and visible window discovery, plus a bundled Codex Skill for safe desktop-use workflows.
 
-It is implemented in C# on `net10.0` using `ModelContextProtocol` `1.2.0`.
-The package targets plain `net10.0` so it can be distributed as a .NET tool; all desktop operations remain Windows-only through runtime guards and Win32 interop.
+It is implemented in C# on `net10.0` using `ModelContextProtocol` `1.3.0`.
+The package targets plain `net10.0` so it can be distributed as a .NET tool. Windows uses native Win32 APIs; Linux and macOS use best-effort command-backed adapters.
 
 ## Quick Install
 
@@ -19,35 +19,38 @@ Click to install in your preferred environment:
 Note:
 - These install links are prepared for the intended NuGet package identity `CP.CodexComputerRun.Mcp.Server`.
 - If the latest package has not been published yet, use the manual source-build or published-executable configuration below.
-- This server is Windows-only and must run from a signed-in Windows desktop session, not WSL.
+- Run the server from the signed-in desktop session you want to control. Windows desktop automation must be launched from Windows, not WSL.
+- Linux support expects common desktop commands such as `xdotool` plus `gnome-screenshot`, `grim`, or ImageMagick `import`.
+- macOS support uses `screencapture`, `pbcopy`, and `osascript`; pointer actions require `cliclick`.
 
 ## What Codex Computer Run Helps With
 
 Codex Computer Run gives an agent a minimal, fast desktop-control layer for:
 
-- **Observe** the full Windows virtual desktop via PNG screenshots.
+- **Observe** the full desktop via PNG screenshots.
 - **Point** the cursor at absolute virtual-screen coordinates.
 - **Click** left, right, or middle mouse buttons, including repeated clicks.
 - **Scroll** the wheel at the current cursor position or supplied coordinates.
 - **Press** single keys and keyboard shortcuts such as `ctrl+l` or `ctrl+shift+escape`.
-- **Paste** Unicode text through the Windows clipboard using `Ctrl+V`.
+- **Paste** Unicode text through the platform clipboard paste path.
 - **Inspect** cursor position and visible top-level windows.
 
-The server is designed for Codex computer-use workflows where the MCP client controls the active Windows desktop.
+The server is designed for Codex computer-use workflows where the MCP client controls the active desktop.
 
-## Windows-Only Design
+## Platform Support
 
-This server intentionally targets Windows:
+Windows remains the primary implementation. Linux and macOS support keeps the same MCP tool surface but depends on external desktop commands that must be available inside the active graphical session.
 
 | Area | Detail |
 |------|--------|
 | Target framework | `net10.0` |
-| Runtime guard | Exits immediately when `OperatingSystem.IsWindows()` is false |
-| Desktop APIs | `user32.dll`, `kernel32.dll`, GDI+ PNG capture, Windows clipboard |
-| Session requirement | Signed-in interactive Windows desktop |
+| Windows APIs | `user32.dll`, `kernel32.dll`, GDI+ PNG capture, Windows clipboard |
+| Linux commands | `xdotool` for pointer/keyboard/window actions; `gnome-screenshot`, `grim`, or `import` for screenshots; `wl-copy`, `xclip`, or `xsel` for clipboard paste |
+| macOS commands | `screencapture`, `pbcopy`, and `osascript`; `cliclick` for pointer position, movement, clicks, and scrolling |
+| Session requirement | Signed-in interactive desktop session |
 | Transport | MCP stdio |
 
-Do not run this server from WSL for desktop automation. Building from WSL through Windows `dotnet.exe` can work, but the MCP server itself must be launched by a Windows MCP client or Windows PowerShell session.
+Do not run this server from WSL to control a Windows desktop. Building from WSL through Windows `dotnet.exe` can work, but the MCP server itself must be launched by a Windows MCP client or Windows PowerShell session.
 
 ## Codex Protocol
 
@@ -98,7 +101,7 @@ Use $codex-computer-run to list visible windows, take a screenshot, and confirm 
 
 ### `screenshot`
 
-Captures the Windows virtual desktop as PNG.
+Captures the current desktop as PNG.
 
 **Parameters:**
 - `path` *(optional)* - output PNG path. If omitted, the image is returned in memory and no temporary file is created.
@@ -110,7 +113,7 @@ Captures the Windows virtual desktop as PNG.
 
 ### `move_mouse`
 
-Moves the cursor to absolute Windows virtual-screen coordinates.
+Moves the cursor to absolute desktop coordinates.
 
 **Parameters:**
 - `x` - absolute X coordinate.
@@ -178,7 +181,7 @@ Presses a keyboard shortcut.
 
 ### `type_text`
 
-Pastes Unicode text into the focused Windows application using the clipboard and `Ctrl+V`.
+Pastes Unicode text into the focused application using the platform clipboard paste path.
 
 **Parameters:**
 - `text` - text to paste.
@@ -190,7 +193,7 @@ Pastes Unicode text into the focused Windows application using the clipboard and
 
 ### `cursor_position`
 
-Returns the current Windows cursor position as JSON.
+Returns the current desktop cursor position as JSON.
 
 **When to use:** Use before or after mouse actions when the agent needs exact coordinates.
 
@@ -198,7 +201,7 @@ Returns the current Windows cursor position as JSON.
 
 ### `list_windows`
 
-Lists visible top-level Windows desktop windows as JSON.
+Lists visible top-level desktop windows as JSON.
 
 **Parameters:**
 - `limit` *(default: `50`)* - maximum number of windows to return.
@@ -209,11 +212,12 @@ Lists visible top-level Windows desktop windows as JSON.
 
 - Screenshot capture avoids temporary files when `path` is omitted.
 - `include_image:false` avoids PNG encoding unless a `path` is supplied.
-- Mouse and keyboard actions use batched `SendInput` calls instead of legacy per-event APIs.
-- `hotkey` presses all keys down and releases them in reverse order in one batch.
-- Clipboard access retries briefly when another process has the clipboard open.
-- Visible window enumeration caches process names by PID during each call.
-- Startup enables per-monitor DPI awareness for correct coordinate and screenshot behavior on mixed-DPI displays.
+- Windows mouse and keyboard actions use batched `SendInput` calls instead of legacy per-event APIs.
+- Windows `hotkey` presses all keys down and releases them in reverse order in one batch.
+- Windows clipboard access retries briefly when another process has the clipboard open.
+- Windows visible window enumeration caches process names by PID during each call.
+- Startup enables per-monitor DPI awareness on Windows for correct coordinate and screenshot behavior on mixed-DPI displays.
+- Linux and macOS adapters fail with actionable dependency messages when required desktop commands are missing.
 - Release publishing enables single-file and ReadyToRun output for faster Codex startup.
 
 ## Solution Layout
@@ -222,7 +226,7 @@ Lists visible top-level Windows desktop windows as JSON.
 CodexComputerRunMCPServer.slnx          # Root solution wrapper for CI and local pack commands
 
 src/
-|-- CodexComputerRunMCPServer/          # MCP host, tools, service layer, Win32 platform layer
+|-- CodexComputerRunMCPServer/          # MCP host, tools, service layer, and platform adapters
 |-- CodexComputerRunMCPServer.Tests/    # TUnit unit and MCP integration tests
 `-- CodexComputerRunMCPServer.slnx      # Source solution file
 
@@ -360,8 +364,8 @@ dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Test
 ```
 
 Current verification:
-- 40 TUnit tests passed.
-- Coverage: 89.09% line coverage, 69.01% branch coverage for testable code.
+- 61 TUnit tests passed.
+- Coverage: 79.01% line coverage, 50.78% branch coverage for testable code.
 - NuGet package verification confirms `skills/codex-computer-run/SKILL.md` and `skills/codex-computer-run/agents/openai.yaml` are bundled.
 - Native Win32 P/Invoke shims are excluded from coverage and verified through the service boundary plus live MCP tool discovery.
 
@@ -369,6 +373,8 @@ Current verification:
 
 ```powershell
 .\scripts\publish-windows.ps1 -Runtime win-x64
+.\scripts\publish-windows.ps1 -Runtime linux-x64
+.\scripts\publish-windows.ps1 -Runtime osx-arm64
 ```
 
 Direct command:
@@ -399,4 +405,4 @@ Once configured, you can ask things like:
 
 ## Safety Notes
 
-This server controls the active Windows desktop. Mouse, keyboard, and clipboard actions affect the currently focused application. Use it only in a trusted desktop session and pair destructive UI actions with screenshots or window checks first.
+This server controls the active desktop. Mouse, keyboard, and clipboard actions affect the currently focused application. Use it only in a trusted desktop session and pair destructive UI actions with screenshots or window checks first.

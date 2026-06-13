@@ -2,14 +2,14 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.chrispulman/codex-computer-run-mcp-server",
   "title": "Codex Computer Run MCP Server",
-  "description": "Windows-only MCP server for Codex desktop control: screenshots, mouse, keyboard, clipboard paste, cursor position, visible window discovery, and a bundled Codex Skill.",
-  "version": "1.0.3",
+  "description": "MCP server for Codex desktop control: screenshots, mouse, keyboard, clipboard paste, cursor position, visible window discovery, and a bundled Codex Skill. Windows uses native Win32 APIs; Linux and macOS use best-effort desktop command adapters.",
+  "version": "1.1.0",
   "packages": [
     {
       "registryType": "nuget",
       "registryBaseUrl": "https://api.nuget.org/v3/index.json",
       "identifier": "CP.CodexComputerRun.Mcp.Server",
-      "version": "1.0.3",
+      "version": "1.1.0",
       "runtimeHint": "dnx",
       "transport": {
         "type": "stdio"

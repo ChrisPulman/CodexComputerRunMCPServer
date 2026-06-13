@@ -91,7 +91,7 @@ internal interface IComputerRunService
 }
 
 /// <summary>
-/// Default Windows-backed implementation of <see cref="IComputerRunService"/>.
+/// Default implementation of <see cref="IComputerRunService"/>.
 /// </summary>
 /// <param name="platform">Platform abstraction responsible for OS-level input and capture operations.</param>
 internal sealed class ComputerRunService(IComputerRunPlatform platform) : IComputerRunService
@@ -99,16 +99,14 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// Creates the default service instance using the built-in Windows platform implementation.
+    /// Creates the default service instance using the built-in platform implementation for the current OS.
     /// </summary>
     /// <returns>A ready-to-use <see cref="IComputerRunService"/> instance.</returns>
-    public static IComputerRunService CreateDefault() => new ComputerRunService(new WindowsComputerRunPlatform());
+    public static IComputerRunService CreateDefault() => new ComputerRunService(ComputerRunPlatformFactory.CreateDefault());
 
     /// <inheritdoc />
     public CallToolResult Screenshot(string? path, bool includeImage)
     {
-        EnsureWindows();
-
         var bounds = platform.GetVirtualScreenBounds();
         var screenshotPath = ResolveOptionalPath(path);
         byte[]? imageBytes = null;
@@ -130,6 +128,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
             CreateScreenshotMessage(screenshotPath, includeImage),
             screenshotPath,
             "image/png",
+            platform.PlatformName,
             bounds.Left,
             bounds.Top,
             bounds.Width,
@@ -151,7 +150,6 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     /// <inheritdoc />
     public string MoveMouse(int x, int y, double? delay)
     {
-        EnsureWindows();
         platform.MoveCursor(x, y);
         Delay.Sleep(delay);
         return $"Moved cursor to ({x}, {y}).";
@@ -160,7 +158,6 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     /// <inheritdoc />
     public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
     {
-        EnsureWindows();
         MoveCursorIfCoordinatesProvided(x, y);
 
         if (clicks < 1)
@@ -180,7 +177,6 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     /// <inheritdoc />
     public string Scroll(int amount, int? x, int? y, double? delay)
     {
-        EnsureWindows();
         MoveCursorIfCoordinatesProvided(x, y);
 
         platform.Scroll(amount);
@@ -191,8 +187,6 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     /// <inheritdoc />
     public string PressKey(string key, double duration, double? delay)
     {
-        EnsureWindows();
-
         var keyChord = KeyboardInput.ResolveKeyChord(key, platform.KeyScan);
         var holdDuration = Delay.FromSeconds(Math.Max(0, duration), nameof(duration));
         platform.PressKey(keyChord, holdDuration);
@@ -204,8 +198,6 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     /// <inheritdoc />
     public string Hotkey(string keys, double? delay)
     {
-        EnsureWindows();
-
         var virtualKeys = KeyboardInput.ResolveHotkey(keys, platform.KeyScan);
         platform.PressHotkey(virtualKeys);
 
@@ -216,11 +208,8 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     /// <inheritdoc />
     public string TypeText(string text, double? delay)
     {
-        EnsureWindows();
-
         var pastedText = text ?? string.Empty;
-        platform.SetClipboardText(pastedText);
-        platform.PressHotkey([KeyboardInput.ControlKey, KeyboardInput.VKey]);
+        platform.PasteText(pastedText);
 
         Delay.Sleep(delay);
         return $"Pasted {pastedText.Length} character(s) into the focused app.";
@@ -229,7 +218,6 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     /// <inheritdoc />
     public string CursorPosition()
     {
-        EnsureWindows();
         var point = platform.GetCursorPosition();
         return JsonSerializer.Serialize(new { x = point.X, y = point.Y }, JsonOptions);
     }
@@ -237,7 +225,6 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     /// <inheritdoc />
     public string ListWindows(int limit)
     {
-        EnsureWindows();
         if (limit < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(limit), "limit must be at least 1.");
@@ -307,17 +294,6 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
         }
     }
 
-    /// <summary>
-    /// Ensures that the current runtime platform is Windows.
-    /// </summary>
-    /// <exception cref="PlatformNotSupportedException">Thrown when running on a non-Windows platform.</exception>
-    private void EnsureWindows()
-    {
-        if (!platform.IsWindows)
-        {
-            throw new PlatformNotSupportedException("CodexComputerRunMCPServer only operates on Windows.");
-        }
-    }
 }
 
 /// <summary>
@@ -326,9 +302,9 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
 internal interface IComputerRunPlatform
 {
     /// <summary>
-    /// Gets a value indicating whether the current platform implementation is running on Windows.
+    /// Gets a display name for the current platform implementation.
     /// </summary>
-    bool IsWindows { get; }
+    string PlatformName { get; }
 
     /// <summary>
     /// Gets the full bounds of the virtual desktop spanning all monitors.
@@ -391,10 +367,10 @@ internal interface IComputerRunPlatform
     void PressHotkey(IReadOnlyList<byte> virtualKeys);
 
     /// <summary>
-    /// Sets clipboard text content.
+    /// Pastes text into the focused application using the platform's preferred text-entry path.
     /// </summary>
-    /// <param name="text">Text to place in clipboard.</param>
-    void SetClipboardText(string text);
+    /// <param name="text">Text to paste.</param>
+    void PasteText(string text);
 
     /// <summary>
     /// Enumerates top-level windows up to the requested limit.
@@ -432,6 +408,7 @@ internal sealed record ScreenshotMetadata(
     string Message,
     string? Path,
     string MimeType,
+    string Platform,
     int Left,
     int Top,
     int Width,

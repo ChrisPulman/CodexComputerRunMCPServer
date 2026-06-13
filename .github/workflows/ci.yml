@@ -14,7 +14,15 @@ permissions:
 
 jobs:
   build_test_pack:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v6
@@ -47,10 +55,12 @@ jobs:
         working-directory: src
 
       - name: Pack
+        if: matrix.os == 'windows-latest'
         run: dotnet pack CodexComputerRunMCPServer.slnx -c Release -o artifacts /p:ContinuousIntegrationBuild=true
         working-directory: src
 
       - name: Upload package artifacts
+        if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v7
         with:
           name: nuget-packages
