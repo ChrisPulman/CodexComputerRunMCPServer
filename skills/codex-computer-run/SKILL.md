@@ -1,13 +1,13 @@
 ---
 name: codex-computer-run
-description: Use this skill when Codex needs to operate or inspect a signed-in Windows desktop through the Codex Computer Run MCP server, including screenshots, visible window discovery, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text paste into focused applications.
+description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, visible window discovery, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text paste into focused applications.
 ---
 
 # Codex Computer Run
 
 ## Overview
 
-Use the Codex Computer Run MCP server as an observation-first control layer for a real Windows desktop session. Its tools affect the active machine, so inspect context before acting and verify after actions that can change state.
+Use the Codex Computer Run MCP server as an observation-first control layer for a real desktop session. Its tools affect the active machine, so inspect context before acting and verify after actions that can change state.
 
 ## Tool Discovery
 
@@ -16,15 +16,21 @@ Use the Codex Computer Run MCP server as an observation-first control layer for 
 - Expect these tools: `screenshot`, `list_windows`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`.
 - If the MCP tools are unavailable, state that the Computer Run server is not configured in the current session instead of simulating desktop interaction with unrelated shell commands.
 
+## Platform Notes
+
+- Windows is the native implementation and uses Win32 desktop APIs.
+- Linux and macOS use best-effort command adapters. If a tool reports a missing dependency such as `xdotool`, `gnome-screenshot`, `cliclick`, or `osascript`, explain the dependency instead of retrying unrelated commands.
+- The server must run in the signed-in graphical session for the desktop it controls.
+
 ## Operating Protocol
 
 1. Observe before acting:
    - Use `list_windows` to identify visible applications and likely targets.
    - Use `screenshot` when visual layout, coordinates, or UI state matters.
    - Use `cursor_position` before relying on the current pointer location.
-2. Plan in absolute Windows virtual-screen coordinates:
+2. Plan in absolute desktop coordinates:
    - Treat coordinates as desktop coordinates, not browser or app-relative coordinates.
-   - Read screenshot metadata for `left`, `top`, `width`, and `height`; multi-monitor layouts can have negative `left` or `top` values.
+   - Read screenshot metadata for `platform`, `left`, `top`, `width`, and `height`; multi-monitor layouts can have negative `left` or `top` values.
    - Move or click only when the target application and coordinates are known.
 3. Act with the narrowest tool:
    - Use `move_mouse` for hover or to position before a click.

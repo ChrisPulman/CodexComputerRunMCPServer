@@ -5,21 +5,21 @@
     <AssemblyName>CodexComputerRunMCPServer</AssemblyName>
     <RootNamespace>CodexComputerRunMCPServer</RootNamespace>
     <PackageId>CP.CodexComputerRun.Mcp.Server</PackageId>
-    <Version>1.0.3</Version>
+    <Version>1.1.0</Version>
     <Title>Codex Computer Run MCP Server</Title>
-    <Description>Windows-only MCP server for Codex desktop control: screenshots, mouse, keyboard, clipboard paste, cursor position, visible window discovery, and a bundled Codex Skill.</Description>
+    <Description>MCP server for Codex desktop control: screenshots, mouse, keyboard, clipboard paste, cursor position, visible window discovery, and a bundled Codex Skill. Windows uses native Win32 APIs; Linux and macOS use best-effort desktop command adapters.</Description>
     <Authors>Chris Pulman</Authors>
     <PackageProjectUrl>https://github.com/ChrisPulman/CodexComputerRunMCPServer</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ChrisPulman/CodexComputerRunMCPServer</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Codex;MCP;Model Context Protocol;Windows;desktop automation;computer use;skill;dotnet</PackageTags>
+    <PackageTags>Codex;MCP;Model Context Protocol;Windows;Linux;macOS;desktop automation;computer use;skill;dotnet</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackAsTool>true</PackAsTool>
     <PackageType>McpServer</PackageType>
     <ToolCommandName>codex-computer-run-mcp-server</ToolCommandName>
-    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <PublishSingleFile>true</PublishSingleFile>
     <PublishReadyToRun>true</PublishReadyToRun>
     <SelfContained>false</SelfContained>

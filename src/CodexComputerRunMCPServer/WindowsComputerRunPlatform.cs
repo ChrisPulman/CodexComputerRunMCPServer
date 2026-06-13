@@ -17,9 +17,9 @@ namespace CodexComputerRunMCPServer;
 internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
 {
     /// <summary>
-    /// Gets a value indicating whether the current process is running on Windows.
+    /// Gets the display name for this platform implementation.
     /// </summary>
-    public bool IsWindows => OperatingSystem.IsWindows();
+    public string PlatformName => "Windows";
 
     /// <summary>
     /// Gets the bounding rectangle that covers the entire virtual desktop across all monitors.
@@ -195,13 +195,23 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
     }
 
     /// <summary>
+    /// Pastes text into the focused application using the clipboard and Ctrl+V.
+    /// </summary>
+    /// <param name="text">The text to paste.</param>
+    public void PasteText(string text)
+    {
+        SetClipboardText(text);
+        PressHotkey([KeyboardInput.ControlKey, KeyboardInput.VKey]);
+    }
+
+    /// <summary>
     /// Replaces clipboard text with the supplied Unicode string.
     /// </summary>
     /// <param name="text">The text to place on the clipboard.</param>
     /// <exception cref="Win32Exception">
     /// Thrown when clipboard access, memory allocation, or clipboard update operations fail.
     /// </exception>
-    public void SetClipboardText(string text)
+    private void SetClipboardText(string text)
     {
         var data = Encoding.Unicode.GetBytes(text + '\0');
         if (!TryOpenClipboard())

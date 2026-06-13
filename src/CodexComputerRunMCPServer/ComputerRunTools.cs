@@ -16,7 +16,7 @@ namespace CodexComputerRunMCPServer;
 public static class ComputerRunTools
 {
     /// <summary>
-    /// Captures the Windows virtual desktop as a PNG image.
+    /// Captures the current virtual desktop as a PNG image.
     /// </summary>
     /// <param name="path">
     /// Optional destination path for the PNG file. If omitted, no file is created.
@@ -28,21 +28,21 @@ public static class ComputerRunTools
     /// A <see cref="CallToolResult"/> containing the screenshot result payload.
     /// </returns>
     [McpServerTool]
-    [Description("Capture the Windows virtual desktop as a PNG. Pass path to save it on disk; omit path for an in-memory MCP image result.")]
+    [Description("Capture the current desktop as a PNG. Pass path to save it on disk; omit path for an in-memory MCP image result.")]
     public static CallToolResult screenshot(
         [Description("Optional output PNG path. If omitted, no temporary file is created.")] string? path = null,
         [Description("Include PNG image data in the MCP tool result.")] bool include_image = true)
         => Invoke(service => service.Screenshot(path, include_image));
 
     /// <summary>
-    /// Moves the mouse cursor to absolute virtual-screen coordinates.
+    /// Moves the mouse cursor to absolute desktop coordinates.
     /// </summary>
     /// <param name="x">Absolute X coordinate.</param>
     /// <param name="y">Absolute Y coordinate.</param>
     /// <param name="delay">Optional post-action delay in seconds.</param>
     /// <returns>A JSON status string returned by the runtime service.</returns>
     [McpServerTool]
-    [Description("Move the mouse cursor to absolute Windows virtual-screen coordinates.")]
+    [Description("Move the mouse cursor to absolute desktop coordinates.")]
     public static string move_mouse(
         [Description("Absolute X coordinate.")] int x,
         [Description("Absolute Y coordinate.")] int y,
@@ -60,7 +60,7 @@ public static class ComputerRunTools
     /// <param name="delay">Optional post-action delay in seconds.</param>
     /// <returns>A JSON status string returned by the runtime service.</returns>
     [McpServerTool]
-    [Description("Click at the current cursor position or at absolute Windows virtual-screen coordinates.")]
+    [Description("Click at the current cursor position or at absolute desktop coordinates.")]
     public static string click(
         [Description("Optional absolute X coordinate.")] int? x = null,
         [Description("Optional absolute Y coordinate.")] int? y = null,
@@ -116,13 +116,13 @@ public static class ComputerRunTools
         => InvokeControl(service => service.Hotkey(keys, delay));
 
     /// <summary>
-    /// Pastes Unicode text into the currently focused Windows application via clipboard and Ctrl+V.
+    /// Pastes Unicode text into the currently focused application using the platform clipboard paste path.
     /// </summary>
     /// <param name="text">Text content to paste.</param>
     /// <param name="delay">Optional post-action delay in seconds.</param>
     /// <returns>A JSON status string returned by the runtime service.</returns>
     [McpServerTool]
-    [Description("Paste Unicode text into the focused Windows application using the clipboard and Ctrl+V.")]
+    [Description("Paste Unicode text into the focused application using the platform clipboard paste path.")]
     public static string type_text(
         [Description("Text to paste into the focused application.")] string text,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
@@ -133,7 +133,7 @@ public static class ComputerRunTools
     /// </summary>
     /// <returns>A JSON payload describing the current cursor coordinates.</returns>
     [McpServerTool]
-    [Description("Return the current Windows cursor position as JSON.")]
+    [Description("Return the current desktop cursor position as JSON.")]
     public static string cursor_position()
         => Invoke(service => service.CursorPosition());
 
@@ -143,7 +143,7 @@ public static class ComputerRunTools
     /// <param name="limit">Maximum number of windows to return.</param>
     /// <returns>A JSON array payload with visible window metadata.</returns>
     [McpServerTool]
-    [Description("List visible top-level Windows desktop windows as JSON.")]
+    [Description("List visible top-level desktop windows as JSON.")]
     public static string list_windows([Description("Maximum number of windows to return.")] int limit = 50)
         => Invoke(service => service.ListWindows(limit));
 

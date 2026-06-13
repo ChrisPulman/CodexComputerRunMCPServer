@@ -17,22 +17,14 @@ public static class Program
     /// <param name="args">Command-line arguments passed to the process.</param>
     /// <returns>
     /// A task that resolves to an exit code:
-    /// <c>0</c> when the server exits normally; <c>1</c> when startup is rejected
-    /// because the current operating system is not Windows.
+    /// <c>0</c> when the server exits normally; <c>1</c> when skill installation fails.
     /// </returns>
     /// <remarks>
-    /// This server is supported only in a signed-in Windows desktop session.
-    /// The method also enables per-monitor DPI awareness before creating and running the host.
+    /// The method enables per-monitor DPI awareness on Windows before creating and running the host.
     /// </remarks>
     [ExcludeFromCodeCoverage]
     public static async Task<int> Main(string[] args)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            Console.Error.WriteLine("CodexComputerRunMCPServer is Windows-only. Run it from a signed-in Windows desktop session.");
-            return 1;
-        }
-
         if (CodexSkillInstaller.IsInstallRequested(args))
         {
             var result = CodexSkillInstaller.InstallBundledSkill(
@@ -43,7 +35,10 @@ public static class Program
             return result.Success ? 0 : 1;
         }
 
-        NativeMethods.TryEnablePerMonitorDpiAwareness();
+        if (OperatingSystem.IsWindows())
+        {
+            NativeMethods.TryEnablePerMonitorDpiAwareness();
+        }
         _ = CodexSkillInstaller.TryAutoInstall(Console.Error);
 
         using var host = CreateHost(args);

@@ -20,6 +20,7 @@ public class ComputerRunServiceTests
 
         var metadata = ReadMetadata(result);
         await Assert.That(metadata.GetProperty("path").ValueKind).IsEqualTo(JsonValueKind.Null);
+        await Assert.That(metadata.GetProperty("platform").GetString()).IsEqualTo("Test");
         await Assert.That(metadata.GetProperty("width").GetInt32()).IsEqualTo(640);
         await Assert.That(metadata.GetProperty("height").GetInt32()).IsEqualTo(480);
     }
@@ -106,15 +107,10 @@ public class ComputerRunServiceTests
         var platform = new TestComputerRunPlatform();
         var service = new ComputerRunService(platform);
 
-        var partialCoordinatesRejected = Throws<ArgumentException>(() => service.Click(1, null, "left", 1, 0, null));
-        var clickCountRejected = Throws<ArgumentOutOfRangeException>(() => service.Click(null, null, "left", 0, 0, null));
-        var buttonRejected = Throws<ArgumentException>(() => service.Click(null, null, "side", 1, 0, null));
-        var scrollCoordinatesRejected = Throws<ArgumentException>(() => service.Scroll(1, null, 2, null));
-
-        await Assert.That(partialCoordinatesRejected).IsTrue();
-        await Assert.That(clickCountRejected).IsTrue();
-        await Assert.That(buttonRejected).IsTrue();
-        await Assert.That(scrollCoordinatesRejected).IsTrue();
+        await Assert.That(() => service.Click(1, null, "left", 1, 0, null)).Throws<ArgumentException>();
+        await Assert.That(() => service.Click(null, null, "left", 0, 0, null)).Throws<ArgumentOutOfRangeException>();
+        await Assert.That(() => service.Click(null, null, "side", 1, 0, null)).Throws<ArgumentException>();
+        await Assert.That(() => service.Scroll(1, null, 2, null)).Throws<ArgumentException>();
     }
 
     [Test]
@@ -133,8 +129,7 @@ public class ComputerRunServiceTests
         await Assert.That(string.Join(",", platform.PressedKeys[0].Chord)).IsEqualTo($"{KeyboardInput.ShiftKey},191");
         await Assert.That(platform.PressedKeys[0].Duration).IsEqualTo(TimeSpan.FromSeconds(0.02));
         await Assert.That(string.Join(",", platform.Hotkeys[0])).IsEqualTo($"{KeyboardInput.ControlKey},76");
-        await Assert.That(platform.ClipboardTexts[0]).IsEqualTo("hello");
-        await Assert.That(string.Join(",", platform.Hotkeys[1])).IsEqualTo($"{KeyboardInput.ControlKey},{KeyboardInput.VKey}");
+        await Assert.That(platform.PastedTexts[0]).IsEqualTo("hello");
     }
 
     [Test]
@@ -157,35 +152,23 @@ public class ComputerRunServiceTests
     {
         var service = new ComputerRunService(new TestComputerRunPlatform());
 
-        await Assert.That(Throws<ArgumentOutOfRangeException>(() => service.ListWindows(0))).IsTrue();
+        await Assert.That(() => service.ListWindows(0)).Throws<ArgumentOutOfRangeException>();
     }
 
     [Test]
-    public async Task Service_RejectsNonWindowsPlatform()
+    public async Task Service_PropagatesUnsupportedPlatformErrors()
     {
-        var service = new ComputerRunService(new TestComputerRunPlatform { IsWindows = false });
+        var service = new ComputerRunService(new UnsupportedComputerRunPlatform("TestOS"));
 
-        await Assert.That(Throws<PlatformNotSupportedException>(() => service.CursorPosition())).IsTrue();
+        await Assert.That(() => service.CursorPosition())
+            .Throws<PlatformNotSupportedException>()
+            .WithMessageContaining("TestOS");
     }
 
     private static JsonElement ReadMetadata(CallToolResult result)
     {
         var text = result.Content.OfType<TextContentBlock>().Single().Text;
         return JsonDocument.Parse(text).RootElement.Clone();
-    }
-
-    private static bool Throws<TException>(Action action)
-        where TException : Exception
-    {
-        try
-        {
-            action();
-            return false;
-        }
-        catch (TException)
-        {
-            return true;
-        }
     }
 
     private static void TryDelete(string path)

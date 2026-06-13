@@ -105,10 +105,10 @@ public class ComputerRunLifecycleTests
         using var second = new DesktopControlLease(enabled: true, TimeSpan.FromMinutes(1), lockFilePath);
         using var firstControl = first.BeginControlInvocation();
 
-        await Assert.That(Throws<InvalidOperationException>(() =>
+        await Assert.That(() =>
         {
             using var secondControl = second.BeginControlInvocation();
-        })).IsTrue();
+        }).Throws<InvalidOperationException>();
     }
 
     [Test]
@@ -149,9 +149,8 @@ public class ComputerRunLifecycleTests
             new DesktopControlLease(enabled: true, TimeSpan.FromMinutes(1), lockFilePath));
 
         _ = ComputerRunTools.cursor_position();
-        var moveRejected = Throws<InvalidOperationException>(() => ComputerRunTools.move_mouse(1, 2));
+        await Assert.That(() => ComputerRunTools.move_mouse(1, 2)).Throws<InvalidOperationException>();
 
-        await Assert.That(moveRejected).IsTrue();
         await Assert.That(service.CursorCalls).IsEqualTo(1);
         await Assert.That(service.MoveCalls).IsEqualTo(0);
     }
@@ -225,19 +224,5 @@ public class ComputerRunLifecycleTests
         public string TypeText(string text, double? delay) => throw new NotSupportedException();
 
         public string ListWindows(int limit) => throw new NotSupportedException();
-    }
-
-    private static bool Throws<TException>(Action action)
-        where TException : Exception
-    {
-        try
-        {
-            action();
-            return false;
-        }
-        catch (TException)
-        {
-            return true;
-        }
     }
 }

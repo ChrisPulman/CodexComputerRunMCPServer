@@ -2,11 +2,12 @@
 
 <!-- mcp-name: io.github.chrispulman/codex-computer-run-mcp-server -->
 
-Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct control over a signed-in Windows desktop session.
+Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct control over a signed-in desktop session.
 It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode paste, cursor position, and visible window discovery, plus a bundled Codex Skill for safe desktop-use workflows.
 
-It is implemented in C# on `net10.0` using `ModelContextProtocol` `1.2.0`.
-The package targets plain `net10.0` so it can be distributed as a .NET tool; all desktop operations remain Windows-only through runtime guards and Win32 interop.
+It is implemented in C# on `net10.0` using `ModelContextProtocol` `1.3.0`.
+The current package and MCP manifest version is `1.1.0`.
+The package targets plain `net10.0` so it can be distributed as a .NET tool. Windows uses native Win32 APIs; Linux and macOS use best-effort command-backed adapters.
 
 ## Quick Install
 
@@ -19,35 +20,40 @@ Click to install in your preferred environment:
 Note:
 - These install links are prepared for the intended NuGet package identity `CP.CodexComputerRun.Mcp.Server`.
 - If the latest package has not been published yet, use the manual source-build or published-executable configuration below.
-- This server is Windows-only and must run from a signed-in Windows desktop session, not WSL.
+- Run the server from the signed-in desktop session you want to control. Windows desktop automation must be launched from Windows, not WSL.
+- Linux support expects `xdotool` for pointer and keyboard actions, `xrandr` as a display-geometry fallback, `wmctrl` or `xdotool` for window discovery, one of `gnome-screenshot`, `grim`, or ImageMagick `import` for screenshots, and one of `wl-copy`, `xclip`, or `xsel` for clipboard paste.
+- macOS support uses `screencapture`, `pbcopy`, and `osascript`; pointer actions require `cliclick`. Screen Recording and Accessibility permissions may be required by macOS.
 
 ## What Codex Computer Run Helps With
 
 Codex Computer Run gives an agent a minimal, fast desktop-control layer for:
 
-- **Observe** the full Windows virtual desktop via PNG screenshots.
+- **Observe** the full desktop via PNG screenshots.
 - **Point** the cursor at absolute virtual-screen coordinates.
-- **Click** left, right, or middle mouse buttons, including repeated clicks.
+- **Click** left, right, or middle mouse buttons where supported, including repeated clicks. The built-in macOS adapter supports left and right clicks.
 - **Scroll** the wheel at the current cursor position or supplied coordinates.
 - **Press** single keys and keyboard shortcuts such as `ctrl+l` or `ctrl+shift+escape`.
-- **Paste** Unicode text through the Windows clipboard using `Ctrl+V`.
+- **Paste** Unicode text through the platform clipboard paste path.
 - **Inspect** cursor position and visible top-level windows.
 
-The server is designed for Codex computer-use workflows where the MCP client controls the active Windows desktop.
+The server is designed for Codex computer-use workflows where the MCP client controls the active desktop.
 
-## Windows-Only Design
+## Platform Support
 
-This server intentionally targets Windows:
+Windows remains the primary implementation. Linux and macOS support keeps the same MCP tool surface but depends on external desktop commands that must be available inside the active graphical session.
 
-| Area | Detail |
-|------|--------|
+| Area | Current behavior |
+|------|------------------|
+| Version | `1.1.0` |
 | Target framework | `net10.0` |
-| Runtime guard | Exits immediately when `OperatingSystem.IsWindows()` is false |
-| Desktop APIs | `user32.dll`, `kernel32.dll`, GDI+ PNG capture, Windows clipboard |
-| Session requirement | Signed-in interactive Windows desktop |
+| Windows | Native Win32 implementation with virtual-screen capture, `SendInput`, clipboard paste, cursor position, and visible top-level window enumeration |
+| Linux | Command-backed adapter using `xdotool` for pointer and keyboard input, `xrandr` for display-geometry fallback, `wmctrl` or `xdotool` for windows, screenshot command fallbacks, and clipboard command fallbacks |
+| macOS | Command-backed adapter using `screencapture`, `pbcopy`, `osascript`, and `cliclick`; macOS middle-click automation is not supported by the built-in adapter |
+| Unsupported OS | Deterministic unsupported-platform errors instead of silent no-ops |
+| Session requirement | Signed-in interactive desktop session |
 | Transport | MCP stdio |
 
-Do not run this server from WSL for desktop automation. Building from WSL through Windows `dotnet.exe` can work, but the MCP server itself must be launched by a Windows MCP client or Windows PowerShell session.
+Do not run this server from WSL to control a Windows desktop. Building from WSL through Windows `dotnet.exe` can work, but the MCP server itself must be launched by a Windows MCP client or Windows PowerShell session.
 
 ## Codex Protocol
 
@@ -58,7 +64,7 @@ When this server is active, agents should follow this operating protocol:
 3. Use `list_windows` to identify visible applications before focusing or interacting with them.
 4. Use `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text` only when the intended foreground application is known.
 5. Prefer `type_text` for text entry because it uses Unicode clipboard paste and is faster and more reliable than simulated per-character typing.
-6. Keep screenshots small in conversation by setting `include_image` to `false` when only dimensions or a saved path are needed.
+6. Keep screenshots small in conversation by setting `include_image` to `false` when only dimensions, platform metadata, or a saved path are needed.
 
 ## Codex Skill
 
@@ -98,11 +104,13 @@ Use $codex-computer-run to list visible windows, take a screenshot, and confirm 
 
 ### `screenshot`
 
-Captures the Windows virtual desktop as PNG.
+Captures the current desktop as PNG.
 
 **Parameters:**
 - `path` *(optional)* - output PNG path. If omitted, the image is returned in memory and no temporary file is created.
 - `include_image` *(default: `true`)* - include PNG image data in the MCP tool result.
+
+**Response:** The first content block is JSON metadata with `message`, `path`, `mimeType`, `platform`, `left`, `top`, `width`, and `height`. When `include_image` is `true`, a PNG image block is also returned.
 
 **When to use:** Use before interacting with the desktop, after UI changes, or when the agent needs visual confirmation.
 
@@ -110,7 +118,7 @@ Captures the Windows virtual desktop as PNG.
 
 ### `move_mouse`
 
-Moves the cursor to absolute Windows virtual-screen coordinates.
+Moves the cursor to absolute desktop coordinates.
 
 **Parameters:**
 - `x` - absolute X coordinate.
@@ -128,7 +136,7 @@ Clicks at the current cursor position or at supplied absolute coordinates.
 **Parameters:**
 - `x` *(optional)* - absolute X coordinate.
 - `y` *(optional)* - absolute Y coordinate.
-- `button` *(default: `left`)* - `left`, `right`, or `middle`.
+- `button` *(default: `left`)* - `left`, `right`, or `middle`; `middle` is not supported by the built-in macOS adapter.
 - `clicks` *(default: `1`)* - number of clicks.
 - `interval` *(default: `0.08`)* - seconds between repeated clicks.
 - `delay` *(optional)* - seconds to wait after the action.
@@ -178,7 +186,7 @@ Presses a keyboard shortcut.
 
 ### `type_text`
 
-Pastes Unicode text into the focused Windows application using the clipboard and `Ctrl+V`.
+Pastes Unicode text into the focused application using the platform clipboard paste path.
 
 **Parameters:**
 - `text` - text to paste.
@@ -190,7 +198,7 @@ Pastes Unicode text into the focused Windows application using the clipboard and
 
 ### `cursor_position`
 
-Returns the current Windows cursor position as JSON.
+Returns the current desktop cursor position as JSON.
 
 **When to use:** Use before or after mouse actions when the agent needs exact coordinates.
 
@@ -198,7 +206,7 @@ Returns the current Windows cursor position as JSON.
 
 ### `list_windows`
 
-Lists visible top-level Windows desktop windows as JSON.
+Lists visible top-level desktop windows as JSON.
 
 **Parameters:**
 - `limit` *(default: `50`)* - maximum number of windows to return.
@@ -209,11 +217,12 @@ Lists visible top-level Windows desktop windows as JSON.
 
 - Screenshot capture avoids temporary files when `path` is omitted.
 - `include_image:false` avoids PNG encoding unless a `path` is supplied.
-- Mouse and keyboard actions use batched `SendInput` calls instead of legacy per-event APIs.
-- `hotkey` presses all keys down and releases them in reverse order in one batch.
-- Clipboard access retries briefly when another process has the clipboard open.
-- Visible window enumeration caches process names by PID during each call.
-- Startup enables per-monitor DPI awareness for correct coordinate and screenshot behavior on mixed-DPI displays.
+- Windows mouse and keyboard actions use batched `SendInput` calls instead of legacy per-event APIs.
+- Windows `hotkey` presses all keys down and releases them in reverse order in one batch.
+- Windows clipboard access retries briefly when another process has the clipboard open.
+- Windows visible window enumeration caches process names by PID during each call.
+- Startup enables per-monitor DPI awareness on Windows for correct coordinate and screenshot behavior on mixed-DPI displays.
+- Linux and macOS adapters fail with actionable dependency messages when required desktop commands are missing.
 - Release publishing enables single-file and ReadyToRun output for faster Codex startup.
 
 ## Solution Layout
@@ -222,7 +231,7 @@ Lists visible top-level Windows desktop windows as JSON.
 CodexComputerRunMCPServer.slnx          # Root solution wrapper for CI and local pack commands
 
 src/
-|-- CodexComputerRunMCPServer/          # MCP host, tools, service layer, Win32 platform layer
+|-- CodexComputerRunMCPServer/          # MCP host, tools, service layer, and platform adapters
 |-- CodexComputerRunMCPServer.Tests/    # TUnit unit and MCP integration tests
 `-- CodexComputerRunMCPServer.slnx      # Source solution file
 
@@ -238,11 +247,13 @@ skills/
 
 ### Lifecycle Safeguards
 
-The server allows multiple Codex sessions to start their own MCP server process so tool discovery remains available in each session. Input-changing tools still coordinate desktop control by taking an exclusive, renewable lease at:
+The server allows multiple Codex sessions to start their own MCP server process so tool discovery remains available in each session. Input-changing tools still coordinate desktop control by taking an exclusive, renewable lease under the platform local application-data folder:
 
 ```text
-%LOCALAPPDATA%\CodexComputerRunMCPServer\control.lock
+CodexComputerRunMCPServer\control.lock
 ```
+
+On Windows this is normally `%LOCALAPPDATA%\CodexComputerRunMCPServer\control.lock`. On Linux and macOS it follows .NET's local application-data location for the signed-in user, falling back to the temp directory if no local application-data path is available.
 
 The control lease is acquired by `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`. If another Codex session currently owns the lease, the tool call fails with a busy message instead of allowing simultaneous mouse, keyboard, or clipboard input. Observation tools (`screenshot`, `cursor_position`, and `list_windows`) remain available from every session.
 
@@ -262,7 +273,9 @@ Optional environment overrides:
 
 ### Fast Codex Desktop Configuration
 
-After publishing, Codex can launch the optimized executable directly:
+After publishing, Codex can launch the optimized executable directly. Use the runtime identifier that matches the OS running the signed-in desktop session.
+
+Windows:
 
 ```toml
 [mcp_servers.codex-computer-run]
@@ -270,17 +283,40 @@ command = "PathTo\\CodexComputerRunMCPServer\\artifacts\\publish\\win-x64\\Codex
 args = []
 ```
 
-The checked-in `.codex/config.toml` uses this fast published-executable path.
+Linux or macOS:
+
+```toml
+[mcp_servers.codex-computer-run]
+command = "/path/to/CodexComputerRunMCPServer/artifacts/publish/linux-x64/CodexComputerRunMCPServer"
+args = []
+```
+
+The checked-in `.codex/config.toml` uses the Windows fast published-executable path for this workspace.
 
 ### Manual MCP Client Configuration
 
 Published executable:
+
+Windows:
 
 ```json
 {
   "mcpServers": {
     "codex-computer-run": {
       "command": "PathTo\\CodexComputerRunMCPServer\\artifacts\\publish\\win-x64\\CodexComputerRunMCPServer.exe",
+      "args": []
+    }
+  }
+}
+```
+
+Linux or macOS:
+
+```json
+{
+  "mcpServers": {
+    "codex-computer-run": {
+      "command": "/path/to/CodexComputerRunMCPServer/artifacts/publish/linux-x64/CodexComputerRunMCPServer",
       "args": []
     }
   }
@@ -323,6 +359,8 @@ Development source run:
 }
 ```
 
+Use forward slashes in the project path on Linux and macOS.
+
 ### Are `mcp-config.development.windows.json` And `mcp-config.windows.json` Required?
 
 No. They are optional convenience snippets for MCP clients that import JSON config files manually.
@@ -336,9 +374,18 @@ Required or primary MCP/Codex files are:
 
 ## Build
 
+Windows PowerShell:
+
 ```powershell
 dotnet restore .\CodexComputerRunMCPServer.slnx
 dotnet build .\CodexComputerRunMCPServer.slnx --configuration Release
+```
+
+Linux or macOS:
+
+```bash
+dotnet restore ./CodexComputerRunMCPServer.slnx
+dotnet build ./CodexComputerRunMCPServer.slnx --configuration Release
 ```
 
 If a running MCP server locks the default `bin\Release` output, build to a verification output path:
@@ -349,8 +396,16 @@ dotnet build .\CodexComputerRunMCPServer.slnx --configuration Release --no-resto
 
 ## Test
 
+Windows PowerShell:
+
 ```powershell
 dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release
+```
+
+Linux or macOS:
+
+```bash
+dotnet test ./src/CodexComputerRunMCPServer.Tests/CodexComputerRunMCPServer.Tests.csproj --configuration Release
 ```
 
 Coverage with TUnit/Microsoft Testing Platform:
@@ -360,15 +415,19 @@ dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Test
 ```
 
 Current verification:
-- 40 TUnit tests passed.
-- Coverage: 89.09% line coverage, 69.01% branch coverage for testable code.
-- NuGet package verification confirms `skills/codex-computer-run/SKILL.md` and `skills/codex-computer-run/agents/openai.yaml` are bundled.
+- 61 TUnit tests passed.
+- Coverage: 77.65% line coverage, 48.37% branch coverage for testable code.
+- Repository and package verification confirm `skills/codex-computer-run/SKILL.md` and `skills/codex-computer-run/agents/openai.yaml` are bundled.
 - Native Win32 P/Invoke shims are excluded from coverage and verified through the service boundary plus live MCP tool discovery.
 
 ## Publish
 
+The helper script name is historical; it now accepts Windows, Linux, and macOS runtime identifiers.
+
 ```powershell
 .\scripts\publish-windows.ps1 -Runtime win-x64
+.\scripts\publish-windows.ps1 -Runtime linux-x64
+.\scripts\publish-windows.ps1 -Runtime osx-arm64
 ```
 
 Direct command:
@@ -379,11 +438,13 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The published `win-x64` executable was validated with an MCP stdio `initialize` and `tools/list` handshake. The server reported all 9 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reported all 9 tools:
 
 ```text
 scroll, hotkey, type_text, screenshot, list_windows, click, move_mouse, press_key, cursor_position
 ```
+
+Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.
 
 ## Example Prompts For Your AI Assistant
 
@@ -399,4 +460,4 @@ Once configured, you can ask things like:
 
 ## Safety Notes
 
-This server controls the active Windows desktop. Mouse, keyboard, and clipboard actions affect the currently focused application. Use it only in a trusted desktop session and pair destructive UI actions with screenshots or window checks first.
+This server controls the active desktop. Mouse, keyboard, and clipboard actions affect the currently focused application. Use it only in a trusted desktop session and pair destructive UI actions with screenshots or window checks first.

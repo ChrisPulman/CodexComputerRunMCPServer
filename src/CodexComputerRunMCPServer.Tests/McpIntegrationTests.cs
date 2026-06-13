@@ -80,9 +80,9 @@ public class McpIntegrationTests
         var package = root.GetProperty("packages")[0];
 
         await Assert.That(root.GetProperty("name").GetString()).IsEqualTo("io.github.chrispulman/codex-computer-run-mcp-server");
-        await Assert.That(root.GetProperty("version").GetString()).IsEqualTo("1.0.3");
+        await Assert.That(root.GetProperty("version").GetString()).IsEqualTo("1.1.0");
         await Assert.That(package.GetProperty("identifier").GetString()).IsEqualTo("CP.CodexComputerRun.Mcp.Server");
-        await Assert.That(package.GetProperty("version").GetString()).IsEqualTo("1.0.3");
+        await Assert.That(package.GetProperty("version").GetString()).IsEqualTo("1.1.0");
         await Assert.That(package.GetProperty("transport").GetProperty("type").GetString()).IsEqualTo("stdio");
     }
 
@@ -104,7 +104,10 @@ public class McpIntegrationTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Readme.md")))
+            if (File.Exists(Path.Combine(directory.FullName, "README.md"))
+                && File.Exists(Path.Combine(directory.FullName, "CodexComputerRunMCPServer.slnx"))
+                && Directory.Exists(Path.Combine(directory.FullName, ".mcp"))
+                && Directory.Exists(Path.Combine(directory.FullName, "skills")))
             {
                 return directory.FullName;
             }

@@ -11,6 +11,8 @@ command = "D:\\Projects\\Github\\chrispulman\\CodexComputerRunMCPServer\\artifac
 args = []
 ```
 
+For Linux or macOS publish output, use the matching runtime folder such as `artifacts/publish/linux-x64/CodexComputerRunMCPServer` or `artifacts/publish/osx-arm64/CodexComputerRunMCPServer`.
+
 Suggested stdio config after NuGet publication:
 
 ```json
