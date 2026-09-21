@@ -47,9 +47,9 @@ The policy changes how much repetitive confirmation and screenshot checking is n
    - Read screenshot metadata for `platform`, `left`, `top`, `width`, and `height`; multi-monitor layouts can have negative `left` or `top` values.
    - Move or click only when the target application and coordinates are known.
 3. Act with the narrowest tool:
-   - Use `move_mouse` for hover or to position before a click.
-   - Use `click` for buttons, menus, tabs, selections, and context menus.
-   - Use `scroll` for pages, lists, combo boxes, and scrollable panes.
+    - Use `move_mouse` for hover or to position before a click; pass `target_handle` when the intended window is known.
+    - Use `click` for buttons, menus, tabs, selections, and context menus; pass `target_handle` so a focus change aborts instead of clicking another app.
+    - Use `scroll` for pages, lists, combo boxes, and scrollable panes; pass `target_handle` when the scroll target is a known window.
    - Use `press_key` for one key such as `enter`, `tab`, `escape`, `f5`, arrows, or a single character.
     - Use `hotkey` for shortcuts such as `ctrl+l`, `ctrl+shift+p`, `alt+tab`, or `ctrl+shift+escape`. When a window handle is known, pass it as `target_handle`.
     - Use `type_text` for text entry and pass `target_handle` whenever focus matters. Windows injects Unicode directly without changing the clipboard; Linux/macOS may use their native clipboard or text-entry fallback.
@@ -71,7 +71,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 - Do not perform data-bearing or destructive UI actions, submit forms, send messages, make purchases, delete files, or change account/security settings unless the user explicitly asked for that exact outcome.
 - Treat reversible interface maintenance and debugging operations as separate from destructive data operations. Closing a confirmed empty tab, opening DevTools, reloading an identified page, dismissing a modal, or switching tabs is not automatically a destructive action.
 - Confirm the intended foreground app with `list_windows` or `screenshot` before typing or pressing shortcuts that could affect the wrong application.
-- When a native window handle is available, pass it as `target_handle` to `press_key`, `hotkey`, or `type_text`; the server aborts rather than routing input to a different foreground app.
+- When a native window handle is available, pass it as `target_handle` to mouse or keyboard actions; the server aborts rather than routing input to a different application.
 - Do not use a global `alt+f4` as a substitute for `close_window` when the intended window can be identified by handle.
 - On Windows, `type_text` does not change the clipboard. On Linux/macOS, check the platform fallback before using it when preserving clipboard contents matters.
 - Keep delays short but use the optional `delay` parameter after actions that trigger UI transitions.

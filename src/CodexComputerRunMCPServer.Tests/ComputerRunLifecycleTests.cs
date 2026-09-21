@@ -176,12 +176,12 @@ public class ComputerRunLifecycleTests
 
         public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region) => throw new NotSupportedException();
 
-        public string MoveMouse(int x, int y, double? delay) => throw new NotSupportedException();
+        public string MoveMouse(int x, int y, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
+        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
             => throw new NotSupportedException();
 
-        public string Scroll(int amount, int? x, int? y, double? delay) => throw new NotSupportedException();
+        public string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle) => throw new NotSupportedException();
 
         public string PressKey(string key, double duration, double? delay, long? targetHandle) => throw new NotSupportedException();
 
@@ -219,7 +219,7 @@ public class ComputerRunLifecycleTests
             return "{}";
         }
 
-        public string MoveMouse(int x, int y, double? delay)
+        public string MoveMouse(int x, int y, double? delay, long? targetHandle)
         {
             MoveCalls++;
             return "move";
@@ -227,10 +227,10 @@ public class ComputerRunLifecycleTests
 
         public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region) => throw new NotSupportedException();
 
-        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
+        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
             => throw new NotSupportedException();
 
-        public string Scroll(int amount, int? x, int? y, double? delay) => throw new NotSupportedException();
+        public string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle) => throw new NotSupportedException();
 
         public string PressKey(string key, double duration, double? delay, long? targetHandle) => throw new NotSupportedException();
 

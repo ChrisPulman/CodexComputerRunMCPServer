@@ -115,9 +115,9 @@ public class ComputerRunServiceTests
         var platform = new TestComputerRunPlatform();
         var service = new ComputerRunService(platform);
 
-        var moved = service.MoveMouse(5, 6, delay: null);
-        var clicked = service.Click(7, 8, "right", clicks: 2, interval: 0.01, delay: null);
-        var scrolled = service.Scroll(-4, 9, 10, delay: null);
+        var moved = service.MoveMouse(5, 6, delay: null, targetHandle: null);
+        var clicked = service.Click(7, 8, "right", clicks: 2, interval: 0.01, delay: null, targetHandle: null);
+        var scrolled = service.Scroll(-4, 9, 10, delay: null, targetHandle: null);
 
         await Assert.That(moved).Contains("(5, 6)");
         await Assert.That(clicked).Contains("Clicked right 2 time(s)");
@@ -134,10 +134,10 @@ public class ComputerRunServiceTests
         var platform = new TestComputerRunPlatform();
         var service = new ComputerRunService(platform);
 
-        await Assert.That(() => service.Click(1, null, "left", 1, 0, null)).Throws<ArgumentException>();
-        await Assert.That(() => service.Click(null, null, "left", 0, 0, null)).Throws<ArgumentOutOfRangeException>();
-        await Assert.That(() => service.Click(null, null, "side", 1, 0, null)).Throws<ArgumentException>();
-        await Assert.That(() => service.Scroll(1, null, 2, null)).Throws<ArgumentException>();
+        await Assert.That(() => service.Click(1, null, "left", 1, 0, null, null)).Throws<ArgumentException>();
+        await Assert.That(() => service.Click(null, null, "left", 0, 0, null, null)).Throws<ArgumentOutOfRangeException>();
+        await Assert.That(() => service.Click(null, null, "side", 1, 0, null, null)).Throws<ArgumentException>();
+        await Assert.That(() => service.Scroll(1, null, 2, null, null)).Throws<ArgumentException>();
     }
 
     [Test]
@@ -302,9 +302,22 @@ public class ComputerRunServiceTests
 
         await Assert.That(() => service.Hotkey("alt+f4", delay: null, targetHandle: 101))
             .Throws<InvalidOperationException>()
-            .WithMessageContaining("No keyboard input was sent");
+            .WithMessageContaining("No desktop input was sent");
 
         await Assert.That(platform.Hotkeys).IsEmpty();
+    }
+
+    [Test]
+    public async Task MouseInput_WithTargetHandle_AbortsWhenTargetIsNotForeground()
+    {
+        var platform = new TestComputerRunPlatform();
+        var service = new ComputerRunService(platform);
+
+        await Assert.That(() => service.Click(10, 20, "left", 1, 0, null, targetHandle: 101))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("No desktop input was sent");
+
+        await Assert.That(platform.Clicks).IsEmpty();
     }
 
     [Test]

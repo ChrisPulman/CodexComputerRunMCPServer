@@ -134,19 +134,19 @@ public class McpIntegrationTests
             return new CallToolResult { Content = [] };
         }
 
-        public string MoveMouse(int x, int y, double? delay)
+        public string MoveMouse(int x, int y, double? delay, long? targetHandle)
         {
             Calls++;
             return "move";
         }
 
-        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
+        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
         {
             Calls++;
             return "click";
         }
 
-        public string Scroll(int amount, int? x, int? y, double? delay)
+        public string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle)
         {
             Calls++;
             return "scroll";

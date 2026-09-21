@@ -28,7 +28,7 @@ internal interface IComputerRunService
     /// <param name="y">The absolute Y coordinate in virtual desktop space.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message.</returns>
-    string MoveMouse(int x, int y, double? delay);
+    string MoveMouse(int x, int y, double? delay, long? targetHandle);
 
     /// <summary>
     /// Performs one or more mouse clicks using the specified button, optionally moving first.
@@ -40,7 +40,7 @@ internal interface IComputerRunService
     /// <param name="interval">Interval in seconds between clicks. Negative values are clamped to 0.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message including final cursor position.</returns>
-    string Click(int? x, int? y, string button, int clicks, double interval, double? delay);
+    string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle);
 
     /// <summary>
     /// Scrolls the mouse wheel by the specified amount, optionally moving first.
@@ -50,7 +50,7 @@ internal interface IComputerRunService
     /// <param name="y">Optional Y coordinate. Must be provided together with <paramref name="x"/>.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message.</returns>
-    string Scroll(int amount, int? x, int? y, double? delay);
+    string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle);
 
     /// <summary>
     /// Presses and holds a resolved key chord for the requested duration.
@@ -183,15 +183,16 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string MoveMouse(int x, int y, double? delay)
+    public string MoveMouse(int x, int y, double? delay, long? targetHandle)
     {
+        EnsureInputTarget(targetHandle, requireForeground: false);
         platform.MoveCursor(x, y);
         Delay.Sleep(delay);
         return $"Moved cursor to ({x}, {y}).";
     }
 
     /// <inheritdoc />
-    public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
+    public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
     {
         MoveCursorIfCoordinatesProvided(x, y);
 
@@ -202,6 +203,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
 
         var parsedButton = MouseButtonParser.Parse(button);
         var intervalDelay = Delay.FromSeconds(Math.Max(0, interval), nameof(interval));
+        EnsureInputTarget(targetHandle, requireForeground: true);
         platform.Click(parsedButton, clicks, intervalDelay);
 
         Delay.Sleep(delay);
@@ -210,10 +212,11 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string Scroll(int amount, int? x, int? y, double? delay)
+    public string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle)
     {
         MoveCursorIfCoordinatesProvided(x, y);
 
+        EnsureInputTarget(targetHandle, requireForeground: true);
         platform.Scroll(amount);
         Delay.Sleep(delay);
         return $"Scrolled {amount} wheel notch(es).";
@@ -224,7 +227,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     {
         var keyChord = KeyboardInput.ResolveKeyChord(key, platform.KeyScan);
         var holdDuration = Delay.FromSeconds(Math.Max(0, duration), nameof(duration));
-        EnsureInputTargetIsForeground(targetHandle);
+        EnsureInputTarget(targetHandle, requireForeground: true);
         platform.PressKey(keyChord, holdDuration);
 
         Delay.Sleep(delay);
@@ -235,7 +238,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     public string Hotkey(string keys, double? delay, long? targetHandle)
     {
         var virtualKeys = KeyboardInput.ResolveHotkey(keys, platform.KeyScan);
-        EnsureInputTargetIsForeground(targetHandle);
+        EnsureInputTarget(targetHandle, requireForeground: true);
         platform.PressHotkey(virtualKeys);
 
         Delay.Sleep(delay);
@@ -246,7 +249,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     public string TypeText(string text, double? delay, long? targetHandle)
     {
         var enteredText = text ?? string.Empty;
-        EnsureInputTargetIsForeground(targetHandle);
+        EnsureInputTarget(targetHandle, requireForeground: true);
         platform.TypeText(enteredText);
 
         Delay.Sleep(delay);
@@ -542,11 +545,11 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     /// <summary>
-    /// Verifies an optional native window handle immediately before keyboard input.
+    /// Verifies an optional native window handle immediately before desktop input.
     /// A failed check aborts without sending any input, preventing a stale focus from
     /// routing a destructive shortcut to another application.
     /// </summary>
-    private void EnsureInputTargetIsForeground(long? targetHandle)
+    private void EnsureInputTarget(long? targetHandle, bool requireForeground)
     {
         if (targetHandle is null)
         {
@@ -565,10 +568,12 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
             throw new InvalidOperationException($"Target window {targetHandle.Value} was not found. No keyboard input was sent.");
         }
 
-        if (target.IsMinimized == true || target.IsForeground != true)
+        if (target.IsMinimized == true || requireForeground && target.IsForeground != true)
         {
             throw new InvalidOperationException(
-                $"Target window {targetHandle.Value} is not the verified foreground window. No keyboard input was sent; activate it and retry with targetHandle.");
+                $"Target window {targetHandle.Value} is not a valid input target (it must be visible" +
+                (requireForeground ? " and foreground" : string.Empty) +
+                "). No desktop input was sent; activate it and retry with targetHandle.");
         }
     }
 

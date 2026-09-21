@@ -300,9 +300,9 @@ Requests a graceful close for one exact top-level window handle. The operation p
 
 ---
 
-### Targeted keyboard input
+### Targeted desktop input
 
-`press_key`, `hotkey`, and `type_text` accept an optional `target_handle`. When supplied, the server re-enumerates that exact window immediately before injecting input and sends nothing if it is missing, minimized, or no longer foreground. This turns a focus race into a safe, actionable error. The recommended sequence is `find_windows` → `activate_window` → input with `target_handle`.
+`move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text` accept an optional `target_handle`. When supplied, the server re-enumerates that exact window immediately before input and sends nothing if it is missing or minimized; clicks, scrolling, and keyboard input additionally require it to be foreground. This turns a focus race into a safe, actionable error. The recommended sequence is `find_windows` → `activate_window` → input with `target_handle`.
 
 ## Performance And Integration Notes
 
@@ -312,7 +312,7 @@ Requests a graceful close for one exact top-level window handle. The operation p
 - Windows `hotkey` presses all keys down and releases them in reverse order in one batch.
 - Windows text entry emits direct Unicode input and leaves the clipboard unchanged.
 - Windows activation uses a bounded foreground-stabilization check; activation is reported as failed when the requested handle does not actually become foreground.
-- Keyboard input can be bound to an exact `target_handle`; a failed foreground check aborts before `SendInput`.
+- Desktop input can be bound to an exact `target_handle`; a failed target check aborts before mouse or keyboard injection.
 - `close_window` uses a graceful, handle-directed close request and verifies the postcondition instead of sending a global shortcut or terminating a process.
 - Window enumeration uses at most one retry for observation-only queries; input-changing operations are never retried automatically.
 - Windows visible window enumeration caches process names by PID during each call.

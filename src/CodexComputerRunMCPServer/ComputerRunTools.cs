@@ -54,8 +54,9 @@ public static class ComputerRunTools
     public static string move_mouse(
         [Description("Absolute X coordinate.")] int x,
         [Description("Absolute Y coordinate.")] int y,
-        [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => InvokeControl("move_mouse", new { x, y, delay }, service => service.MoveMouse(x, y, delay));
+        [Description("Optional delay after the action, in seconds.")] double? delay = null,
+        [Description("Optional native window handle previously returned by find_windows. When supplied, movement is aborted if that window is stale or minimized.")] long? target_handle = null)
+        => InvokeControl("move_mouse", new { x, y, delay, target_handle }, service => service.MoveMouse(x, y, delay, target_handle));
 
     /// <summary>
     /// Performs a mouse click at the current cursor position or at provided coordinates.
@@ -75,8 +76,9 @@ public static class ComputerRunTools
         [Description("Mouse button: left, right, or middle.")] string button = "left",
         [Description("Number of clicks.")] int clicks = 1,
         [Description("Delay between repeated clicks, in seconds.")] double interval = 0.08,
-        [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => InvokeControl("click", new { x, y, button, clicks, interval, delay }, service => service.Click(x, y, button, clicks, interval, delay));
+        [Description("Optional delay after the action, in seconds.")] double? delay = null,
+        [Description("Optional native window handle previously returned by find_windows. When supplied, the click is aborted unless that exact window is still foreground.")] long? target_handle = null)
+        => InvokeControl("click", new { x, y, button, clicks, interval, delay, target_handle }, service => service.Click(x, y, button, clicks, interval, delay, target_handle));
 
     /// <summary>
     /// Scrolls the mouse wheel, optionally after moving to specified coordinates.
@@ -92,8 +94,9 @@ public static class ComputerRunTools
         [Description("Wheel notches. Positive scrolls up; negative scrolls down.")] int amount = -3,
         [Description("Optional absolute X coordinate to move to before scrolling.")] int? x = null,
         [Description("Optional absolute Y coordinate to move to before scrolling.")] int? y = null,
-        [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => InvokeControl("scroll", new { amount, x, y, delay }, service => service.Scroll(amount, x, y, delay));
+        [Description("Optional delay after the action, in seconds.")] double? delay = null,
+        [Description("Optional native window handle previously returned by find_windows. When supplied, scrolling is aborted unless that exact window is still foreground.")] long? target_handle = null)
+        => InvokeControl("scroll", new { amount, x, y, delay, target_handle }, service => service.Scroll(amount, x, y, delay, target_handle));
 
     /// <summary>
     /// Presses and releases a single keyboard key.
