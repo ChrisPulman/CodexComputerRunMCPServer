@@ -196,6 +196,12 @@ public class ComputerRunLifecycleTests
 
         public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage) => throw new NotSupportedException();
 
+        public string VerifyWindow(long handle, string? processName, string? titleContains, bool requireForeground, bool allowMinimized)
+            => throw new NotSupportedException();
+
+        public string WaitForWindow(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int timeoutMilliseconds, int pollMilliseconds)
+            => throw new NotSupportedException();
+
         public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
     }
 
@@ -236,6 +242,12 @@ public class ComputerRunLifecycleTests
             => throw new NotSupportedException();
 
         public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage) => throw new NotSupportedException();
+
+        public string VerifyWindow(long handle, string? processName, string? titleContains, bool requireForeground, bool allowMinimized)
+            => throw new NotSupportedException();
+
+        public string WaitForWindow(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int timeoutMilliseconds, int pollMilliseconds)
+            => throw new NotSupportedException();
 
         public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
     }

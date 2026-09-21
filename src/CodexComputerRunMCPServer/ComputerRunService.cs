@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
@@ -98,6 +99,16 @@ internal interface IComputerRunService
     /// Captures the screen-space bounds of a previously enumerated window handle.
     /// </summary>
     CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage);
+
+    /// <summary>
+    /// Verifies that a native window still matches the requested targeting predicates.
+    /// </summary>
+    string VerifyWindow(long handle, string? processName, string? titleContains, bool requireForeground, bool allowMinimized);
+
+    /// <summary>
+    /// Waits for a matching window for a bounded period without performing desktop input.
+    /// </summary>
+    string WaitForWindow(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int timeoutMilliseconds, int pollMilliseconds);
 
     /// <summary>
     /// Brings a previously enumerated top-level window to the foreground.
@@ -249,7 +260,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
             throw new ArgumentOutOfRangeException(nameof(limit), "limit must be at least 1.");
         }
 
-        var windows = platform.ListWindows(limit);
+        var windows = ListWindowsWithSingleRetry(limit);
         return JsonSerializer.Serialize(windows, JsonOptions);
     }
 
@@ -265,16 +276,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
 
         var normalizedProcess = NormalizeFilter(processName);
         var normalizedTitle = NormalizeFilter(titleContains);
-        var windows = platform
-            .ListWindows(WindowEnumerationLimit)
-            .Where(window => normalizedProcess is null
-                || string.Equals(window.ProcessName, normalizedProcess, StringComparison.OrdinalIgnoreCase))
-            .Where(window => normalizedTitle is null
-                || window.Title.Contains(normalizedTitle, StringComparison.OrdinalIgnoreCase))
-            .Where(window => !foregroundOnly || window.IsForeground == true)
-            .Where(window => includeMinimized || window.IsMinimized != true)
-            .Take(limit)
-            .ToArray();
+        var windows = FindMatchingWindowInfos(normalizedProcess, normalizedTitle, foregroundOnly, includeMinimized, limit);
 
         return JsonSerializer.Serialize(windows, JsonOptions);
     }
@@ -287,8 +289,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
             throw new ArgumentOutOfRangeException(nameof(handle), "handle must be a positive native window handle.");
         }
 
-        var window = platform
-            .ListWindows(WindowEnumerationLimit)
+        var window = ListWindowsWithSingleRetry(WindowEnumerationLimit)
             .FirstOrDefault(candidate => candidate.Handle == handle);
 
         if (window is null)
@@ -306,6 +307,98 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
 
         var bounds = new Rectangle(window.Bounds.Left, window.Bounds.Top, window.Bounds.Width, window.Bounds.Height);
         return Screenshot(path, includeImage, bounds);
+    }
+
+    /// <inheritdoc />
+    public string VerifyWindow(
+        long handle,
+        string? processName,
+        string? titleContains,
+        bool requireForeground,
+        bool allowMinimized)
+    {
+        if (handle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "handle must be a positive native window handle.");
+        }
+
+        var expectedProcess = NormalizeFilter(processName);
+        var expectedTitle = NormalizeFilter(titleContains);
+        var window = ListWindowsWithSingleRetry(WindowEnumerationLimit)
+            .FirstOrDefault(candidate => candidate.Handle == handle);
+
+        if (window is null)
+        {
+            return JsonSerializer.Serialize(new { ok = false, handle, reason = "not_found", window = (WindowInfo?)null }, JsonOptions);
+        }
+
+        var reason = expectedProcess is not null
+            && !string.Equals(window.ProcessName, expectedProcess, StringComparison.OrdinalIgnoreCase)
+            ? "process_mismatch"
+            : expectedTitle is not null
+                && !window.Title.Contains(expectedTitle, StringComparison.OrdinalIgnoreCase)
+                ? "title_mismatch"
+                : requireForeground && window.IsForeground != true
+                    ? "not_foreground"
+                    : !allowMinimized && window.IsMinimized == true
+                        ? "minimized"
+                        : "matched";
+
+        return JsonSerializer.Serialize(new { ok = reason == "matched", handle, reason, window }, JsonOptions);
+    }
+
+    /// <inheritdoc />
+    public string WaitForWindow(
+        string? processName,
+        string? titleContains,
+        bool foregroundOnly,
+        bool includeMinimized,
+        int timeoutMilliseconds,
+        int pollMilliseconds)
+    {
+        if (timeoutMilliseconds is < 0 or > MaxWindowWaitMilliseconds)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeoutMilliseconds), $"timeoutMilliseconds must be between 0 and {MaxWindowWaitMilliseconds}.");
+        }
+
+        if (pollMilliseconds is < MinWindowPollMilliseconds or > MaxWindowPollMilliseconds)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pollMilliseconds), $"pollMilliseconds must be between {MinWindowPollMilliseconds} and {MaxWindowPollMilliseconds}.");
+        }
+
+        var expectedProcess = NormalizeFilter(processName);
+        var expectedTitle = NormalizeFilter(titleContains);
+        var stopwatch = Stopwatch.StartNew();
+
+        while (true)
+        {
+            var match = FindMatchingWindowInfos(expectedProcess, expectedTitle, foregroundOnly, includeMinimized, 1)
+                .FirstOrDefault();
+            if (match is not null)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    found = true,
+                    waitedMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                    window = match,
+                }, JsonOptions);
+            }
+
+            if (stopwatch.ElapsedMilliseconds >= timeoutMilliseconds)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    found = false,
+                    waitedMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                    window = (WindowInfo?)null,
+                }, JsonOptions);
+            }
+
+            var remaining = TimeSpan.FromMilliseconds(timeoutMilliseconds) - stopwatch.Elapsed;
+            Thread.Sleep(remaining < TimeSpan.FromMilliseconds(pollMilliseconds)
+                ? remaining
+                : TimeSpan.FromMilliseconds(pollMilliseconds));
+        }
     }
 
     /// <inheritdoc />
@@ -374,7 +467,41 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     private static string? NormalizeFilter(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private IReadOnlyList<WindowInfo> FindMatchingWindowInfos(
+        string? processName,
+        string? titleContains,
+        bool foregroundOnly,
+        bool includeMinimized,
+        int limit)
+        => ListWindowsWithSingleRetry(WindowEnumerationLimit)
+            .Where(window => processName is null
+                || string.Equals(window.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
+            .Where(window => titleContains is null
+                || window.Title.Contains(titleContains, StringComparison.OrdinalIgnoreCase))
+            .Where(window => !foregroundOnly || window.IsForeground == true)
+            .Where(window => includeMinimized || window.IsMinimized != true)
+            .Take(limit)
+            .ToArray();
+
+    /// <summary>
+    /// Retries only the idempotent window enumeration once. Input-changing operations never use this path.
+    /// </summary>
+    private IReadOnlyList<WindowInfo> ListWindowsWithSingleRetry(int limit)
+    {
+        try
+        {
+            return platform.ListWindows(limit);
+        }
+        catch
+        {
+            return platform.ListWindows(limit);
+        }
+    }
+
     private const int WindowEnumerationLimit = 256;
+    private const int MaxWindowWaitMilliseconds = 30_000;
+    private const int MinWindowPollMilliseconds = 25;
+    private const int MaxWindowPollMilliseconds = 1_000;
 
     /// <summary>
     /// Creates a user-facing status message for screenshot operations.

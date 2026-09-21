@@ -1,6 +1,6 @@
 ---
 name: codex-computer-run
-description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, metadata-based window targeting, visible window discovery, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text entry into focused applications.
+description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, metadata-based window targeting, bounded window waits, pre/post window verification, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text entry into focused applications.
 ---
 
 # Codex Computer Run
@@ -25,7 +25,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 
 - Prefer the `mcp__codex_computer_run__` namespace when available.
 - If tools are deferred, search for `ComputerRun`, `codex computer run`, or `desktop screenshot mouse keyboard` and choose the namespace that exposes the complete tool set.
-- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `activate_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`.
+- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `verify_window`, `wait_for_window`, `activate_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`.
 - If the MCP tools are unavailable, state that the Computer Run server is not configured in the current session instead of simulating desktop interaction with unrelated shell commands.
 
 ## Platform Notes
@@ -38,7 +38,8 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 
 1. Observe before acting:
    - Use `list_windows` or `find_windows` to identify visible applications and likely targets.
-   - Use `activate_window` with a handle returned by `list_windows` when the intended target is not already foreground.
+   - Use `verify_window` before input when the handle may be stale, and `wait_for_window` after launching or recovering a named application.
+   - Use `activate_window` with a handle returned by `list_windows` or `find_windows` when the intended target is not already foreground.
    - Use `screenshot_window` when a target handle and bounds are known; use full `screenshot` when the wider desktop context matters.
    - Use `cursor_position` before relying on the current pointer location.
 2. Plan in absolute desktop coordinates:
@@ -55,7 +56,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 4. Verify after meaningful actions:
    - In normal mode, use `screenshot` after navigation, clicks, scrolls, or text entry when the resulting state matters.
    - In developer mode, do not capture after every low-risk click when the target and action sequence are already known. Capture after navigation, a meaningful UI transition, a failed action, an unexpected focus change, or before/after a potentially data-bearing action.
-   - Use `list_windows` again after task switching or launching apps, or whenever the foreground target becomes ambiguous.
+   - Use `list_windows` or `verify_window` again after task switching or launching apps, or whenever the foreground target becomes ambiguous.
 
 ## Screenshots
 
@@ -71,6 +72,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 - Confirm the intended foreground app with `list_windows` or `screenshot` before typing or pressing shortcuts that could affect the wrong application.
 - On Windows, `type_text` does not change the clipboard. On Linux/macOS, check the platform fallback before using it when preserving clipboard contents matters.
 - Keep delays short but use the optional `delay` parameter after actions that trigger UI transitions.
+- The server may retry observation-only window enumeration once, but never automatically retries clicks, key presses, hotkeys, scrolling, or text entry.
 
 ## Quick Checks
 

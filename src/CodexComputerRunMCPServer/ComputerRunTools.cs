@@ -183,6 +183,39 @@ public static class ComputerRunTools
         => Invoke("screenshot_window", new { handle, hasPath = !string.IsNullOrWhiteSpace(path), includeImage = include_image }, service => service.ScreenshotWindow(handle, path, include_image));
 
     /// <summary>
+    /// Verifies that a previously selected window still matches its expected identity and state.
+    /// </summary>
+    [McpServerTool]
+    [Description("Verify a window handle before or after an action. Returns JSON with ok, reason, and current window metadata without changing desktop state.")]
+    public static string verify_window(
+        [Description("Native window handle returned by list_windows or find_windows.")] long handle,
+        [Description("Optional expected process name, matched case-insensitively.")] string? process_name = null,
+        [Description("Optional expected case-insensitive title substring.")] string? title_contains = null,
+        [Description("Require the window to be the foreground window.")] bool require_foreground = false,
+        [Description("Allow the window to be minimized.")] bool allow_minimized = true)
+        => Invoke(
+            "verify_window",
+            new { handle, hasProcessFilter = !string.IsNullOrWhiteSpace(process_name), hasTitleFilter = !string.IsNullOrWhiteSpace(title_contains), require_foreground, allow_minimized },
+            service => service.VerifyWindow(handle, process_name, title_contains, require_foreground, allow_minimized));
+
+    /// <summary>
+    /// Waits for a matching window using a bounded observation-only retry loop.
+    /// </summary>
+    [McpServerTool]
+    [Description("Wait for a visible window matching optional process/title/state filters. The wait is bounded to 30 seconds and never sends input.")]
+    public static string wait_for_window(
+        [Description("Optional process name, matched case-insensitively.")] string? process_name = null,
+        [Description("Optional case-insensitive title substring.")] string? title_contains = null,
+        [Description("Return only windows reported as foreground.")] bool foreground_only = false,
+        [Description("Include minimized windows in the result.")] bool include_minimized = true,
+        [Description("Maximum wait in milliseconds, from 0 to 30000.")] int timeout_ms = 5000,
+        [Description("Polling interval in milliseconds, from 25 to 1000.")] int poll_ms = 100)
+        => Invoke(
+            "wait_for_window",
+            new { hasProcessFilter = !string.IsNullOrWhiteSpace(process_name), hasTitleFilter = !string.IsNullOrWhiteSpace(title_contains), foreground_only, include_minimized, timeout_ms, poll_ms },
+            service => service.WaitForWindow(process_name, title_contains, foreground_only, include_minimized, timeout_ms, poll_ms));
+
+    /// <summary>
     /// Brings a window returned by <see cref="list_windows"/> to the foreground.
     /// </summary>
     /// <param name="handle">Native window handle returned by list_windows.</param>

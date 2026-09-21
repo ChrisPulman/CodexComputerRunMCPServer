@@ -229,6 +229,52 @@ public class ComputerRunServiceTests
     }
 
     [Test]
+    public async Task WindowQueries_RetryEnumerationOnceAndVerifyState()
+    {
+        var platform = new TestComputerRunPlatform { ListWindowsFailuresRemaining = 1 };
+        var service = new ComputerRunService(platform);
+
+        var verification = JsonDocument.Parse(service.VerifyWindow(100, "notepad", "untitled", requireForeground: true, allowMinimized: false)).RootElement;
+
+        await Assert.That(verification.GetProperty("ok").GetBoolean()).IsTrue();
+        await Assert.That(verification.GetProperty("reason").GetString()).IsEqualTo("matched");
+        await Assert.That(platform.ListWindowsFailuresRemaining).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task VerifyWindow_ReturnsReasonForStaleHandle()
+    {
+        var service = new ComputerRunService(new TestComputerRunPlatform());
+
+        var verification = JsonDocument.Parse(service.VerifyWindow(999, null, null, false, true)).RootElement;
+
+        await Assert.That(verification.GetProperty("ok").GetBoolean()).IsFalse();
+        await Assert.That(verification.GetProperty("reason").GetString()).IsEqualTo("not_found");
+    }
+
+    [Test]
+    public async Task WaitForWindow_FindsMatchingWindowWithoutInput()
+    {
+        var service = new ComputerRunService(new TestComputerRunPlatform());
+
+        var result = JsonDocument.Parse(service.WaitForWindow("notepad", "untitled", foregroundOnly: true, includeMinimized: false, timeoutMilliseconds: 0, pollMilliseconds: 25)).RootElement;
+
+        await Assert.That(result.GetProperty("found").GetBoolean()).IsTrue();
+        await Assert.That(result.GetProperty("window").GetProperty("handle").GetInt64()).IsEqualTo(100);
+    }
+
+    [Test]
+    public async Task WaitForWindow_RejectsUnboundedArguments()
+    {
+        var service = new ComputerRunService(new TestComputerRunPlatform());
+
+        await Assert.That(() => service.WaitForWindow(null, null, false, true, 30_001, 100))
+            .Throws<ArgumentOutOfRangeException>();
+        await Assert.That(() => service.WaitForWindow(null, null, false, true, 0, 10))
+            .Throws<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
     public async Task ActivateWindow_DelegatesHandleAndRestoreFlag()
     {
         var platform = new TestComputerRunPlatform();

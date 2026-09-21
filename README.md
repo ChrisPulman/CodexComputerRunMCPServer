@@ -248,6 +248,34 @@ Captures the screen-space bounds of a visible window selected by native handle. 
 
 ---
 
+### `verify_window`
+
+Checks whether a native window handle still identifies the expected process, title, foreground state, and minimized state. It is observation-only and returns JSON with `ok`, `reason`, and current metadata.
+
+**Parameters:**
+- `handle` - native window handle returned by `list_windows` or `find_windows`.
+- `process_name` *(optional)* - expected process name.
+- `title_contains` *(optional)* - expected title substring.
+- `require_foreground` *(optional)* - require current foreground focus.
+- `allow_minimized` *(optional)* - allow a minimized match; defaults to `true`.
+
+**When to use:** Call immediately before an input-changing action when a handle may have become stale, and after a meaningful transition when you need a machine-readable postcondition.
+
+---
+
+### `wait_for_window`
+
+Waits for a visible window matching optional process, title, foreground, and minimized-state filters. It never sends input and is bounded to 30 seconds; a single failed window enumeration is retried because the query is idempotent.
+
+**Parameters:**
+- `process_name`, `title_contains`, `foreground_only`, `include_minimized` - same targeting filters as `find_windows`.
+- `timeout_ms` *(optional)* - maximum wait from 0 to 30000 milliseconds; defaults to 5000.
+- `poll_ms` *(optional)* - polling interval from 25 to 1000 milliseconds; defaults to 100.
+
+**When to use:** Use after launching an identified application or waiting for a known window to return after a crash. Do not use a retry loop around clicks, keystrokes, or text entry because repeating those could duplicate a user action.
+
+---
+
 ### `activate_window`
 
 Brings a previously enumerated window to the foreground by its native handle.
@@ -265,6 +293,7 @@ Brings a previously enumerated window to the foreground by its native handle.
 - Windows mouse and keyboard actions use batched `SendInput` calls instead of legacy per-event APIs.
 - Windows `hotkey` presses all keys down and releases them in reverse order in one batch.
 - Windows text entry emits direct Unicode input and leaves the clipboard unchanged.
+- Window enumeration uses at most one retry for observation-only queries; input-changing operations are never retried automatically.
 - Windows visible window enumeration caches process names by PID during each call.
 - Startup enables per-monitor DPI awareness on Windows for correct coordinate and screenshot behavior on mixed-DPI displays.
 - Linux and macOS adapters fail with actionable dependency messages when required desktop commands are missing.
@@ -489,10 +518,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 12 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 14 tools:
 
 ```text
-activate_window, scroll, hotkey, type_text, screenshot, list_windows, find_windows, screenshot_window, click, move_mouse, press_key, cursor_position
+activate_window, scroll, hotkey, type_text, screenshot, list_windows, find_windows, screenshot_window, verify_window, wait_for_window, click, move_mouse, press_key, cursor_position
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.
@@ -503,6 +532,7 @@ Once configured, you can ask things like:
 
 - "Call `screenshot` and describe the active window."
 - "Call `find_windows` for `msedge` with a title containing `Discord`, activate the returned handle, then call `screenshot_window`."
+- "Wait for the identified Notepad window, verify its handle and foreground state, then enter the requested text."
 - "List visible windows and tell me which browser tabs or apps are available."
 - "Move the mouse to `x=400`, `y=300`, click, then take another screenshot."
 - "Press `ctrl+l`, type `https://example.com`, then press `enter`."

@@ -30,6 +30,8 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public List<(long Handle, bool Restore)> ActivatedWindows { get; } = [];
 
+    public int ListWindowsFailuresRemaining { get; set; }
+
     public List<WindowInfo> Windows { get; } =
     [
         new(100, 200, "notepad", "Untitled - Notepad", true, false, new WindowBounds(10, 20, 640, 480)),
@@ -74,7 +76,16 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public void TypeText(string text) => PastedTexts.Add(text);
 
-    public IReadOnlyList<WindowInfo> ListWindows(int limit) => Windows.Take(limit).ToArray();
+    public IReadOnlyList<WindowInfo> ListWindows(int limit)
+    {
+        if (ListWindowsFailuresRemaining > 0)
+        {
+            ListWindowsFailuresRemaining--;
+            throw new InvalidOperationException("temporary window enumeration failure");
+        }
+
+        return Windows.Take(limit).ToArray();
+    }
 
     public void ActivateWindow(long handle, bool restore) => ActivatedWindows.Add((handle, restore));
 
