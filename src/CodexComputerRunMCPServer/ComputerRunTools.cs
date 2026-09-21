@@ -222,6 +222,50 @@ public static class ComputerRunTools
             service => service.WaitForWindow(process_name, title_contains, foreground_only, include_minimized, timeout_ms, poll_ms));
 
     /// <summary>
+    /// Finds native UI Automation elements inside one exact window by semantic metadata.
+    /// </summary>
+    [McpServerTool]
+    [Description("Find semantic UI elements inside an exact window by accessible name, role, or automation id. Windows uses UI Automation and returns stable runtime element ids plus supported control patterns.")]
+    public static string find_ui_elements(
+        [Description("Native window handle returned by list_windows or find_windows.")] long window_handle,
+        [Description("Optional case-insensitive substring of the accessible element name.")] string? name_contains = null,
+        [Description("Optional semantic role such as button, edit, checkbox, hyperlink, list, or pane.")] string? role = null,
+        [Description("Optional exact AutomationId exposed by the control.")] string? automation_id = null,
+        [Description("Maximum matching elements, from 1 to 1000.")] int max_elements = 100)
+        => InvokeSemanticObservation(
+            "find_ui_elements",
+            new { window_handle, hasNameFilter = !string.IsNullOrWhiteSpace(name_contains), role, hasAutomationIdFilter = !string.IsNullOrWhiteSpace(automation_id), max_elements },
+            () => SemanticService.FindElements(window_handle, name_contains, role, automation_id, max_elements));
+
+    /// <summary>
+    /// Invokes or focuses one semantic UI Automation element previously found in a window.
+    /// </summary>
+    [McpServerTool]
+    [Description("Act on one semantic UI element previously returned by find_ui_elements. Supported actions are invoke, toggle, select, focus, expand, and collapse; the window and element are re-resolved before action.")]
+    public static string invoke_ui_element(
+        [Description("Native window handle containing the element.")] long window_handle,
+        [Description("Element id returned by find_ui_elements.")] string element_id,
+        [Description("Action: invoke, toggle, select, focus, expand, or collapse.")] string action = "invoke")
+        => InvokeSemanticControl(
+            "invoke_ui_element",
+            new { window_handle, elementIdLength = element_id?.Length ?? 0, action },
+            () => SemanticService.InvokeElement(window_handle, element_id ?? string.Empty, action));
+
+    /// <summary>
+    /// Sets the value of one semantic UI Automation value element.
+    /// </summary>
+    [McpServerTool]
+    [Description("Set a text/value control identified by find_ui_elements. The element is re-resolved and must expose ValuePattern and report that it is writable.")]
+    public static string set_ui_value(
+        [Description("Native window handle containing the element.")] long window_handle,
+        [Description("Element id returned by find_ui_elements.")] string element_id,
+        [Description("New value to set. The value is not written to the audit log.")] string value)
+        => InvokeSemanticControl(
+            "set_ui_value",
+            new { window_handle, elementIdLength = element_id?.Length ?? 0, valueLength = value?.Length ?? 0 },
+            () => SemanticService.SetValue(window_handle, element_id ?? string.Empty, value ?? string.Empty));
+
+    /// <summary>
     /// Brings a window returned by <see cref="list_windows"/> to the foreground.
     /// </summary>
     /// <param name="handle">Native window handle returned by list_windows.</param>
@@ -478,6 +522,21 @@ public static class ComputerRunTools
         ArgumentNullException.ThrowIfNull(action);
         using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
         using var control = dryRun ? null : ComputerRunToolRuntime.BeginDesktopControlInvocation();
+        return ComputerRunAuditLogger.Execute(tool, arguments, action);
+    }
+
+    private static TResult InvokeSemanticObservation<TResult>(string tool, object? arguments, Func<TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        return ComputerRunAuditLogger.Execute(tool, arguments, action);
+    }
+
+    private static TResult InvokeSemanticControl<TResult>(string tool, object? arguments, Func<TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        using var control = ComputerRunToolRuntime.BeginDesktopControlInvocation();
         return ComputerRunAuditLogger.Execute(tool, arguments, action);
     }
 

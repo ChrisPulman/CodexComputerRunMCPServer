@@ -312,6 +312,10 @@ The filesystem tools make the server useful for general desktop work such as org
 
 `copy_path` and `move_path` use an exact destination rather than silently treating it as a parent directory. Existing destination directories are never merged, and directories cannot be moved or copied into themselves. `delete_path` is permanent and requires `dry_run:false`; non-empty directories also require `recursive:true`. Dry-run plans do not claim the desktop-control lease, so several safe inspections/plans can run concurrently; the lease is acquired only when a mutation is actually applied. The skill still requires confirmation immediately before destructive deletion when the surrounding user task has not explicitly authorized that exact deletion.
 
+### Semantic UI controls
+
+`find_ui_elements` inspects one exact native window through Windows UI Automation and searches by accessible name, role, or `AutomationId`. It returns a runtime element id, accessible metadata, bounds, and supported patterns such as `invoke`, `toggle`, `select`, `value`, and `expandCollapse`. `invoke_ui_element` and `set_ui_value` re-resolve the element inside the same window immediately before acting, so a stale element id fails instead of being redirected to a different control. The adapter currently requires Windows UI Automation; non-Windows builds return an explicit unsupported-platform error.
+
 ### Local Git operations
 
 `git_status`, `git_init`, `git_clone`, `git_create_branch`, and `git_commit` provide bounded local repository workflows. `git_status` is observation-only. The other four default to `dry_run:true`; they return the exact repository, branch, destination, or commit plan and do not contact a remote until a caller explicitly applies the operation. Git arguments are passed directly to the process runner rather than through a shell, so spaces and punctuation in paths or commit messages stay data instead of becoming commands. There is intentionally no automatic push or remote repository deletion in this layer.
@@ -555,10 +559,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 31 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 34 tools:
 
 ```text
-activate_window, click, close_window, copy_path, create_directory, cursor_position, delete_path, find_windows, git_clone, git_commit, git_create_branch, git_init, git_status, hotkey, launch_application, list_directory, list_processes, list_windows, move_mouse, move_path, open_url, press_key, read_text_file, screenshot, screenshot_window, scroll, type_text, verify_window, wait_for_process, wait_for_window, write_text_file
+activate_window, click, close_window, copy_path, create_directory, cursor_position, delete_path, find_ui_elements, find_windows, git_clone, git_commit, git_create_branch, git_init, git_status, hotkey, invoke_ui_element, launch_application, list_directory, list_processes, list_windows, move_mouse, move_path, open_url, press_key, read_text_file, screenshot, screenshot_window, scroll, set_ui_value, type_text, verify_window, wait_for_process, wait_for_window, write_text_file
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.
