@@ -304,6 +304,14 @@ Requests a graceful close for one exact top-level window handle. The operation p
 
 `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text` accept an optional `target_handle`. When supplied, the server re-enumerates that exact window immediately before input and sends nothing if it is missing or minimized; clicks, scrolling, and keyboard input additionally require it to be foreground. This turns a focus race into a safe, actionable error. The recommended sequence is `find_windows` → `activate_window` → input with `target_handle`.
 
+---
+
+### Filesystem operations
+
+The filesystem tools make the server useful for general desktop work such as organizing folders. `list_directory` is observation-only, uses an entry limit, and does not follow reparse points during recursive scans. `create_directory`, `copy_path`, `move_path`, and `delete_path` default to `dry_run:true`, returning a normalized plan without changing anything. To apply a mutation, the caller must explicitly pass `dry_run:false` for the exact path that was inspected.
+
+`copy_path` and `move_path` use an exact destination rather than silently treating it as a parent directory. Existing destination directories are never merged, and directories cannot be moved or copied into themselves. `delete_path` is permanent and requires `dry_run:false`; non-empty directories also require `recursive:true`. The skill still requires confirmation immediately before destructive deletion when the surrounding user task has not explicitly authorized that exact deletion.
+
 ## Performance And Integration Notes
 
 - Screenshot capture avoids temporary files when `path` is omitted.
@@ -539,10 +547,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 15 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 20 tools:
 
 ```text
-activate_window, close_window, scroll, hotkey, type_text, screenshot, list_windows, find_windows, screenshot_window, verify_window, wait_for_window, click, move_mouse, press_key, cursor_position
+activate_window, close_window, copy_path, create_directory, delete_path, list_directory, move_path, scroll, hotkey, type_text, screenshot, list_windows, find_windows, screenshot_window, verify_window, wait_for_window, click, move_mouse, press_key, cursor_position
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.

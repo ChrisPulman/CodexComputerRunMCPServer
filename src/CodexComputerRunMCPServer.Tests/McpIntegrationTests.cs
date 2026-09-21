@@ -31,9 +31,9 @@ public class McpIntegrationTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(tools.Length).IsEqualTo(15);
+        await Assert.That(tools.Length).IsEqualTo(20);
         await Assert.That(string.Join("|", tools)).IsEqualTo(
-            "activate_window|click|close_window|cursor_position|find_windows|hotkey|list_windows|move_mouse|press_key|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_window");
+            "activate_window|click|close_window|copy_path|create_directory|cursor_position|delete_path|find_windows|hotkey|list_directory|list_windows|move_mouse|move_path|press_key|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_window");
     }
 
     [Test]
@@ -73,6 +73,11 @@ public class McpIntegrationTests
         _ = ComputerRunTools.verify_window(100, process_name: "notepad", title_contains: "untitled", require_foreground: true, allow_minimized: false);
         _ = ComputerRunTools.wait_for_window(process_name: "notepad", title_contains: "untitled", foreground_only: false, include_minimized: true, timeout_ms: 0, poll_ms: 25);
         _ = ComputerRunTools.close_window(100, timeout_ms: 0);
+        _ = ComputerRunTools.list_directory(Path.GetTempPath(), max_entries: 1);
+        _ = ComputerRunTools.create_directory(Path.Combine(Path.GetTempPath(), "codex-computer-run-dry-run"), dry_run: true);
+        _ = ComputerRunTools.copy_path(AppContext.BaseDirectory, Path.Combine(Path.GetTempPath(), "codex-computer-run-copy-dry-run"), dry_run: true);
+        _ = ComputerRunTools.move_path(AppContext.BaseDirectory, Path.Combine(Path.GetTempPath(), "codex-computer-run-move-dry-run"), dry_run: true);
+        _ = ComputerRunTools.delete_path(Path.GetTempPath(), dry_run: true);
 
         await Assert.That(service.Calls).IsEqualTo(15);
     }

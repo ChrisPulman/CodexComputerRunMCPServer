@@ -244,6 +244,62 @@ public static class ComputerRunTools
         [Description("Maximum time to wait for the window to disappear, from 0 to 5000 milliseconds.")] int timeout_ms = 1000)
         => InvokeControl("close_window", new { handle, timeout_ms }, service => service.CloseWindow(handle, timeout_ms));
 
+    /// <summary>
+    /// Lists files and directories with bounded enumeration.
+    /// </summary>
+    [McpServerTool]
+    [Description("List a directory as bounded JSON metadata. It never changes the filesystem, does not follow directory junctions/symlinks during recursive scans, and reports inaccessible children as errors.")]
+    public static string list_directory(
+        [Description("Directory path. Environment variables are expanded and the result is normalized to an absolute path.")] string path,
+        [Description("Recurse into child directories, excluding reparse points.")] bool recursive = false,
+        [Description("Maximum entries to return, from 1 to 5000.")] int max_entries = 500)
+        => InvokeFileObservation("list_directory", new { hasPath = !string.IsNullOrWhiteSpace(path), recursive, max_entries }, () => FileSystemService.ListDirectory(path, recursive, max_entries));
+
+    /// <summary>
+    /// Creates a directory, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Create a directory. dry_run defaults to true and returns the exact normalized path without changing anything.")]
+    public static string create_directory(
+        [Description("Directory path to create.")] string path,
+        [Description("When true, only return the plan; when false, create the directory.")] bool dry_run = true)
+        => InvokeFileMutation("create_directory", new { hasPath = !string.IsNullOrWhiteSpace(path), dry_run }, () => FileSystemService.CreateDirectory(path, dry_run));
+
+    /// <summary>
+    /// Copies a file or directory, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Copy one file or directory to an exact destination. dry_run defaults to true; recursive directory copies skip reparse points.")]
+    public static string copy_path(
+        [Description("Existing source file or directory.")] string source,
+        [Description("Exact destination path, not an implicit parent directory.")] string destination,
+        [Description("Allow an existing destination file to be replaced. Existing destination directories are never merged.")] bool overwrite = false,
+        [Description("When true, only return the plan; when false, perform the copy.")] bool dry_run = true)
+        => InvokeFileMutation("copy_path", new { hasSource = !string.IsNullOrWhiteSpace(source), hasDestination = !string.IsNullOrWhiteSpace(destination), overwrite, dry_run }, () => FileSystemService.CopyPath(source, destination, overwrite, dry_run));
+
+    /// <summary>
+    /// Moves or renames a file or directory, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Move or rename one file or directory to an exact destination. dry_run defaults to true and a directory cannot be moved into itself.")]
+    public static string move_path(
+        [Description("Existing source file or directory.")] string source,
+        [Description("Exact destination path, not an implicit parent directory.")] string destination,
+        [Description("Allow an existing destination file to be replaced. Existing destination directories are never merged.")] bool overwrite = false,
+        [Description("When true, only return the plan; when false, perform the move.")] bool dry_run = true)
+        => InvokeFileMutation("move_path", new { hasSource = !string.IsNullOrWhiteSpace(source), hasDestination = !string.IsNullOrWhiteSpace(destination), overwrite, dry_run }, () => FileSystemService.MovePath(source, destination, overwrite, dry_run));
+
+    /// <summary>
+    /// Deletes a file or directory, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Delete one exact file or directory. dry_run defaults to true; actual deletion is permanent, and recursive must be explicitly true for non-empty directories.")]
+    public static string delete_path(
+        [Description("Existing file or directory to delete.")] string path,
+        [Description("Allow deletion of directory contents when dry_run is false.")] bool recursive = false,
+        [Description("When true, only return the plan; when false, permanently delete the exact path.")] bool dry_run = true)
+        => InvokeFileMutation("delete_path", new { hasPath = !string.IsNullOrWhiteSpace(path), recursive, dry_run }, () => FileSystemService.DeletePath(path, recursive, dry_run));
+
     private static TResult Invoke<TResult>(string tool, object? arguments, Func<IComputerRunService, TResult> action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -257,6 +313,21 @@ public static class ComputerRunTools
         using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
         using var control = ComputerRunToolRuntime.BeginDesktopControlInvocation();
         return ComputerRunAuditLogger.Execute(tool, arguments, () => action(ComputerRunToolRuntime.Service));
+    }
+
+    private static TResult InvokeFileObservation<TResult>(string tool, object? arguments, Func<TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        return ComputerRunAuditLogger.Execute(tool, arguments, action);
+    }
+
+    private static TResult InvokeFileMutation<TResult>(string tool, object? arguments, Func<TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        using var control = ComputerRunToolRuntime.BeginDesktopControlInvocation();
+        return ComputerRunAuditLogger.Execute(tool, arguments, action);
     }
 
     private static Rectangle? CreateScreenshotRegion(int? left, int? top, int? width, int? height)
