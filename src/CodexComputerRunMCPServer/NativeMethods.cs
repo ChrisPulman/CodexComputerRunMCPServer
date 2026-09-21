@@ -6,7 +6,7 @@ namespace CodexComputerRunMCPServer;
 
 /// <summary>
 /// Provides Win32 interop constants, structures, delegates, and native function imports
-/// used for input simulation, clipboard operations, DPI awareness, and window enumeration.
+/// used for input simulation, DPI awareness, and window enumeration.
 /// </summary>
 /// <remarks>
 /// This type is marked as excluded from code coverage because it contains platform invoke declarations.
@@ -65,14 +65,9 @@ internal static partial class NativeMethods
     public const uint KeyEventKeyUp = 0x0002;
 
     /// <summary>
-    /// Clipboard format identifier for Unicode text (<c>CF_UNICODETEXT</c>).
+    /// Keyboard Unicode scan-code event flag.
     /// </summary>
-    public const uint CfUnicodeText = 13;
-
-    /// <summary>
-    /// Movable global memory allocation flag (<c>GMEM_MOVEABLE</c>).
-    /// </summary>
-    public const uint GmemMoveable = 0x0002;
+    public const uint KeyEventUnicode = 0x0004;
 
     /// <summary>
     /// X coordinate of the virtual screen.
@@ -330,80 +325,6 @@ internal static partial class NativeMethods
     /// </returns>
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern short VkKeyScan(char ch);
-
-    /// <summary>
-    /// Opens the clipboard for examination and modification.
-    /// </summary>
-    /// <param name="hWndNewOwner">Handle of the window opening the clipboard, or <see cref="IntPtr.Zero"/>.</param>
-    /// <returns><see langword="true"/> if successful; otherwise, <see langword="false"/>.</returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool OpenClipboard(IntPtr hWndNewOwner);
-
-    /// <summary>
-    /// Empties the clipboard and frees handles to data in the clipboard.
-    /// </summary>
-    /// <returns><see langword="true"/> if successful; otherwise, <see langword="false"/>.</returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool EmptyClipboard();
-
-    /// <summary>
-    /// Places data on the clipboard in the specified format.
-    /// </summary>
-    /// <param name="format">Clipboard format identifier.</param>
-    /// <param name="handle">Handle to data in global memory.</param>
-    /// <returns>
-    /// Handle to the data if successful; otherwise, <see cref="IntPtr.Zero"/>.
-    /// </returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    public static extern IntPtr SetClipboardData(uint format, IntPtr handle);
-
-    /// <summary>
-    /// Closes the clipboard.
-    /// </summary>
-    /// <returns><see langword="true"/> if successful; otherwise, <see langword="false"/>.</returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool CloseClipboard();
-
-    /// <summary>
-    /// Allocates memory from the process default heap.
-    /// </summary>
-    /// <param name="flags">Allocation flags (for example, <see cref="GmemMoveable"/>).</param>
-    /// <param name="bytes">Number of bytes to allocate.</param>
-    /// <returns>
-    /// Handle to the allocated memory block, or <see cref="IntPtr.Zero"/> on failure.
-    /// </returns>
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr GlobalAlloc(uint flags, UIntPtr bytes);
-
-    /// <summary>
-    /// Locks a global memory object and returns a pointer to the first byte.
-    /// </summary>
-    /// <param name="handle">Handle to the global memory object.</param>
-    /// <returns>Pointer to the memory block, or <see cref="IntPtr.Zero"/> on failure.</returns>
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr GlobalLock(IntPtr handle);
-
-    /// <summary>
-    /// Decrements the lock count associated with a global memory object.
-    /// </summary>
-    /// <param name="handle">Handle to the global memory object.</param>
-    /// <returns><see langword="true"/> if successful; otherwise, <see langword="false"/>.</returns>
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool GlobalUnlock(IntPtr handle);
-
-    /// <summary>
-    /// Frees the specified global memory object.
-    /// </summary>
-    /// <param name="handle">Handle to the global memory object.</param>
-    /// <returns>
-    /// <see cref="IntPtr.Zero"/> if successful; otherwise, the original handle.
-    /// </returns>
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr GlobalFree(IntPtr handle);
 
     /// <summary>
     /// Enumerates all top-level windows on the screen.

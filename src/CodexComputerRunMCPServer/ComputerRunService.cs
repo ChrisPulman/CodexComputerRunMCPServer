@@ -69,11 +69,11 @@ internal interface IComputerRunService
     string Hotkey(string keys, double? delay);
 
     /// <summary>
-    /// Pastes text into the focused application by setting the clipboard and sending Ctrl+V.
+    /// Enters text into the focused application using the platform's preferred text-entry path.
     /// </summary>
     /// <param name="text">Text to paste. <see langword="null"/> is treated as an empty string.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
-    /// <returns>A human-readable operation result message with pasted character count.</returns>
+    /// <returns>A human-readable operation result message with entered character count.</returns>
     string TypeText(string text, double? delay);
 
     /// <summary>
@@ -217,11 +217,11 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     /// <inheritdoc />
     public string TypeText(string text, double? delay)
     {
-        var pastedText = text ?? string.Empty;
-        platform.PasteText(pastedText);
+        var enteredText = text ?? string.Empty;
+        platform.TypeText(enteredText);
 
         Delay.Sleep(delay);
-        return $"Pasted {pastedText.Length} character(s) into the focused app.";
+        return $"Entered {enteredText.Length} character(s) into the focused app.";
     }
 
     /// <inheritdoc />
@@ -406,10 +406,10 @@ internal interface IComputerRunPlatform
     void PressHotkey(IReadOnlyList<byte> virtualKeys);
 
     /// <summary>
-    /// Pastes text into the focused application using the platform's preferred text-entry path.
+    /// Enters text into the focused application using the platform's preferred text-entry path.
     /// </summary>
     /// <param name="text">Text to paste.</param>
-    void PasteText(string text);
+    void TypeText(string text);
 
     /// <summary>
     /// Enumerates top-level windows up to the requested limit.

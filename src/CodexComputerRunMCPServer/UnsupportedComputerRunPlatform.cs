@@ -39,7 +39,7 @@ internal sealed class UnsupportedComputerRunPlatform(string osDescription) : ICo
     public void PressHotkey(IReadOnlyList<byte> virtualKeys) => throw CreateException();
 
     /// <inheritdoc />
-    public void PasteText(string text) => throw CreateException();
+    public void TypeText(string text) => throw CreateException();
 
     /// <inheritdoc />
     public IReadOnlyList<WindowInfo> ListWindows(int limit) => throw CreateException();

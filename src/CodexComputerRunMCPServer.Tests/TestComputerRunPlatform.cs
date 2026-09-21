@@ -72,7 +72,7 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public void PressHotkey(IReadOnlyList<byte> virtualKeys) => Hotkeys.Add(virtualKeys.ToArray());
 
-    public void PasteText(string text) => PastedTexts.Add(text);
+    public void TypeText(string text) => PastedTexts.Add(text);
 
     public IReadOnlyList<WindowInfo> ListWindows(int limit) => Windows.Take(limit).ToArray();
 

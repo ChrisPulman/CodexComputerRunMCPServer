@@ -21,7 +21,7 @@ Note:
 - These install links are prepared for the intended NuGet package identity `CP.CodexComputerRun.Mcp.Server`.
 - If the latest package has not been published yet, use the manual source-build or published-executable configuration below.
 - Run the server from the signed-in desktop session you want to control. Windows desktop automation must be launched from Windows, not WSL.
-- Linux support expects `xdotool` for pointer and keyboard actions, `xrandr` as a display-geometry fallback, `wmctrl` or `xdotool` for window discovery, one of `gnome-screenshot`, `grim`, or ImageMagick `import` for screenshots, and one of `wl-copy`, `xclip`, or `xsel` for clipboard paste.
+- Linux support expects `xdotool` for pointer and keyboard actions, `xrandr` as a display-geometry fallback, `wmctrl` or `xdotool` for window discovery, one of `gnome-screenshot`, `grim`, or ImageMagick `import` for screenshots, and one of `wl-copy`, `xclip`, `xsel`, or `xdotool` for text entry.
 - macOS support uses `screencapture`, `pbcopy`, and `osascript`; pointer actions require `cliclick`. Screen Recording and Accessibility permissions may be required by macOS.
 
 ## What Codex Computer Run Helps With
@@ -33,7 +33,7 @@ Codex Computer Run gives an agent a minimal, fast desktop-control layer for:
 - **Click** left, right, or middle mouse buttons where supported, including repeated clicks. The built-in macOS adapter supports left and right clicks.
 - **Scroll** the wheel at the current cursor position or supplied coordinates.
 - **Press** single keys and keyboard shortcuts such as `ctrl+l` or `ctrl+shift+escape`.
-- **Paste** Unicode text through the platform clipboard paste path.
+- **Enter** Unicode text through the platform's preferred text-entry path.
 - **Inspect** cursor position and visible top-level windows.
 
 The server is designed for Codex computer-use workflows where the MCP client controls the active desktop.
@@ -46,7 +46,7 @@ Windows remains the primary implementation. Linux and macOS support keeps the sa
 |------|------------------|
 | Version | `1.1.0` |
 | Target framework | `net10.0` |
-| Windows | Native Win32 implementation with virtual-screen capture, `SendInput`, clipboard paste, cursor position, and visible top-level window enumeration |
+| Windows | Native Win32 implementation with virtual-screen capture, direct Unicode `SendInput`, cursor position, and visible top-level window enumeration |
 | Linux | Command-backed adapter using `xdotool` for pointer and keyboard input, `xrandr` for display-geometry fallback, `wmctrl` or `xdotool` for windows, screenshot command fallbacks, and clipboard command fallbacks |
 | macOS | Command-backed adapter using `screencapture`, `pbcopy`, `osascript`, and `cliclick`; macOS middle-click automation is not supported by the built-in adapter |
 | Unsupported OS | Deterministic unsupported-platform errors instead of silent no-ops |
@@ -63,7 +63,7 @@ When this server is active, agents should follow this operating protocol:
 2. Use `cursor_position` before relative manual reasoning about the current pointer location.
 3. Use `list_windows` to identify visible applications before focusing or interacting with them.
 4. Use `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text` only when the intended foreground application is known.
-5. Prefer `type_text` for text entry because it uses Unicode clipboard paste and is faster and more reliable than simulated per-character typing.
+5. Prefer `type_text` for text entry because Windows uses direct Unicode input without changing the clipboard; Linux/macOS use their available native text-entry fallback.
 6. Keep screenshots small in conversation by setting `include_image` to `false` when only dimensions, platform metadata, or a saved path are needed.
 
 ## Codex Skill
@@ -189,7 +189,7 @@ Presses a keyboard shortcut.
 
 ### `type_text`
 
-Pastes Unicode text into the focused application using the platform clipboard paste path.
+Enters Unicode text into the focused application. On Windows it emits Unicode keyboard events directly and does not modify the clipboard; other platforms use their available native fallback.
 
 **Parameters:**
 - `text` - text to paste.
@@ -272,7 +272,7 @@ CodexComputerRunMCPServer\control.lock
 
 On Windows this is normally `%LOCALAPPDATA%\CodexComputerRunMCPServer\control.lock`. On Linux and macOS it follows .NET's local application-data location for the signed-in user, falling back to the temp directory if no local application-data path is available.
 
-The control lease is acquired by `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`. If another Codex session currently owns the lease, the tool call fails with a busy message instead of allowing simultaneous mouse, keyboard, or clipboard input. Observation tools (`screenshot`, `cursor_position`, and `list_windows`) remain available from every session.
+The control lease is acquired by `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`. If another Codex session currently owns the lease, the tool call fails with a busy message instead of allowing simultaneous mouse or keyboard input. Observation tools (`screenshot`, `cursor_position`, and `list_windows`) remain available from every session.
 
 After the latest control action, the owning process keeps the lease briefly so follow-up clicks or keystrokes from the same session are not interleaved with another session. The lease is also released immediately when the owning MCP process exits.
 

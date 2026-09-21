@@ -51,7 +51,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
    - Use `scroll` for pages, lists, combo boxes, and scrollable panes.
    - Use `press_key` for one key such as `enter`, `tab`, `escape`, `f5`, arrows, or a single character.
    - Use `hotkey` for shortcuts such as `ctrl+l`, `ctrl+shift+p`, `alt+tab`, or `ctrl+shift+escape`.
-   - Use `type_text` for text entry; it pastes Unicode through the clipboard and is faster and more reliable than repeated key presses.
+   - Use `type_text` for text entry. Windows injects Unicode directly without changing the clipboard; Linux/macOS may use their native clipboard or text-entry fallback.
 4. Verify after meaningful actions:
    - In normal mode, use `screenshot` after navigation, clicks, scrolls, or text entry when the resulting state matters.
    - In developer mode, do not capture after every low-risk click when the target and action sequence are already known. Capture after navigation, a meaningful UI transition, a failed action, an unexpected focus change, or before/after a potentially data-bearing action.
@@ -69,7 +69,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 - Do not perform data-bearing or destructive UI actions, submit forms, send messages, make purchases, delete files, or change account/security settings unless the user explicitly asked for that exact outcome.
 - Treat reversible interface maintenance and debugging operations as separate from destructive data operations. Closing a confirmed empty tab, opening DevTools, reloading an identified page, dismissing a modal, or switching tabs is not automatically a destructive action.
 - Confirm the intended foreground app with `list_windows` or `screenshot` before typing or pressing shortcuts that could affect the wrong application.
-- Treat `type_text` as clipboard-changing; use it only when pasting into the focused target is intended.
+- On Windows, `type_text` does not change the clipboard. On Linux/macOS, check the platform fallback before using it when preserving clipboard contents matters.
 - Keep delays short but use the optional `delay` parameter after actions that trigger UI transitions.
 
 ## Quick Checks

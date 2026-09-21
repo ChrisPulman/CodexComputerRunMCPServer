@@ -141,18 +141,18 @@ public class ComputerRunServiceTests
     }
 
     [Test]
-    public async Task KeyboardActions_ResolveSingleKeysHotkeysAndPaste()
+    public async Task KeyboardActions_ResolveSingleKeysHotkeysAndTextEntry()
     {
         var platform = new TestComputerRunPlatform();
         var service = new ComputerRunService(platform);
 
         var keyResult = service.PressKey("?", duration: 0.02, delay: null);
         var hotkeyResult = service.Hotkey("ctrl+l", delay: null);
-        var pasteResult = service.TypeText("hello", delay: null);
+        var typeResult = service.TypeText("hello", delay: null);
 
         await Assert.That(keyResult).Contains("Pressed ?");
         await Assert.That(hotkeyResult).Contains("ctrl+l");
-        await Assert.That(pasteResult).Contains("5 character");
+        await Assert.That(typeResult).Contains("5 character");
         await Assert.That(string.Join(",", platform.PressedKeys[0].Chord)).IsEqualTo($"{KeyboardInput.ShiftKey},191");
         await Assert.That(platform.PressedKeys[0].Duration).IsEqualTo(TimeSpan.FromSeconds(0.02));
         await Assert.That(string.Join(",", platform.Hotkeys[0])).IsEqualTo($"{KeyboardInput.ControlKey},76");

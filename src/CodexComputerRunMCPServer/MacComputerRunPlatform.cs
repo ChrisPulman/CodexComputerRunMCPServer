@@ -120,7 +120,7 @@ internal sealed class MacComputerRunPlatform(IExternalCommandRunner? commandRunn
     }
 
     /// <inheritdoc />
-    public void PasteText(string text)
+    public void TypeText(string text)
     {
         if (!CommandRunner.CommandExists("pbcopy"))
         {

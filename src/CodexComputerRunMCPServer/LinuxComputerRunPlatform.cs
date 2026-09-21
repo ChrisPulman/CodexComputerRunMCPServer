@@ -187,7 +187,7 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
     }
 
     /// <inheritdoc />
-    public void PasteText(string text)
+    public void TypeText(string text)
     {
         if (TrySetClipboardText(text))
         {

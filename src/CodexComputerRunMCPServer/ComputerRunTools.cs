@@ -121,13 +121,13 @@ public static class ComputerRunTools
         => InvokeControl(service => service.Hotkey(keys, delay));
 
     /// <summary>
-    /// Pastes Unicode text into the currently focused application using the platform clipboard paste path.
+    /// Enters Unicode text into the currently focused application using the platform's preferred text-entry path.
     /// </summary>
     /// <param name="text">Text content to paste.</param>
     /// <param name="delay">Optional post-action delay in seconds.</param>
     /// <returns>A JSON status string returned by the runtime service.</returns>
     [McpServerTool]
-    [Description("Paste Unicode text into the focused application using the platform clipboard paste path.")]
+    [Description("Enter Unicode text into the focused application. Windows uses direct Unicode input without changing the clipboard.")]
     public static string type_text(
         [Description("Text to paste into the focused application.")] string text,
         [Description("Optional delay after the action, in seconds.")] double? delay = null)
