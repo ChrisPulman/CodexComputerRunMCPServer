@@ -109,6 +109,36 @@ public class FileSystemServiceTests
             .WithMessageContaining("filesystem root");
     }
 
+    [Test]
+    public async Task TextFileOperationsAreBoundedAndAtomic()
+    {
+        var root = CreateTestDirectory();
+        try
+        {
+            var path = Path.Combine(root, "notes.txt");
+            var content = "línea uno\nsegunda línea";
+
+            var plan = JsonDocument.Parse(FileSystemService.WriteTextFile(path, content, overwrite: false, dryRun: true)).RootElement;
+            await Assert.That(plan.GetProperty("changed").GetBoolean()).IsFalse();
+            await Assert.That(File.Exists(path)).IsFalse();
+
+            _ = FileSystemService.WriteTextFile(path, content, overwrite: false, dryRun: false);
+            var read = JsonDocument.Parse(FileSystemService.ReadTextFile(path, maxBytes: 1_000_000)).RootElement;
+            await Assert.That(read.GetProperty("content").GetString()).IsEqualTo(content);
+            await Assert.That(read.GetProperty("truncated").GetBoolean()).IsFalse();
+
+            var bounded = JsonDocument.Parse(FileSystemService.ReadTextFile(path, maxBytes: 5)).RootElement;
+            await Assert.That(bounded.GetProperty("truncated").GetBoolean()).IsTrue();
+            await Assert.That(() => FileSystemService.WriteTextFile(path, "replace", overwrite: false, dryRun: true))
+                .Throws<IOException>()
+                .WithMessageContaining("overwrite=false");
+        }
+        finally
+        {
+            TryDelete(root);
+        }
+    }
+
     private static string CreateTestDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), "codex-computer-run-files", Guid.NewGuid().ToString("N"));

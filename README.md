@@ -308,7 +308,7 @@ Requests a graceful close for one exact top-level window handle. The operation p
 
 ### Filesystem operations
 
-The filesystem tools make the server useful for general desktop work such as organizing folders. `list_directory` is observation-only, uses an entry limit, and does not follow reparse points during recursive scans. `create_directory`, `copy_path`, `move_path`, and `delete_path` default to `dry_run:true`, returning a normalized plan without changing anything. To apply a mutation, the caller must explicitly pass `dry_run:false` for the exact path that was inspected.
+The filesystem tools make the server useful for general desktop work such as organizing folders. `list_directory` is observation-only, uses an entry limit, and does not follow reparse points during recursive scans. `read_text_file` reads bounded UTF-8 content without changing the file. `create_directory`, `copy_path`, `move_path`, `delete_path`, and `write_text_file` default to `dry_run:true`, returning a normalized plan without changing anything. To apply a mutation, the caller must explicitly pass `dry_run:false` for the exact path that was inspected.
 
 `copy_path` and `move_path` use an exact destination rather than silently treating it as a parent directory. Existing destination directories are never merged, and directories cannot be moved or copied into themselves. `delete_path` is permanent and requires `dry_run:false`; non-empty directories also require `recursive:true`. Dry-run plans do not claim the desktop-control lease, so several safe inspections/plans can run concurrently; the lease is acquired only when a mutation is actually applied. The skill still requires confirmation immediately before destructive deletion when the surrounding user task has not explicitly authorized that exact deletion.
 
@@ -555,10 +555,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 29 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 31 tools:
 
 ```text
-activate_window, click, close_window, copy_path, create_directory, cursor_position, delete_path, find_windows, git_clone, git_commit, git_create_branch, git_init, git_status, hotkey, launch_application, list_directory, list_processes, list_windows, move_mouse, move_path, open_url, press_key, screenshot, screenshot_window, scroll, type_text, verify_window, wait_for_process, wait_for_window
+activate_window, click, close_window, copy_path, create_directory, cursor_position, delete_path, find_windows, git_clone, git_commit, git_create_branch, git_init, git_status, hotkey, launch_application, list_directory, list_processes, list_windows, move_mouse, move_path, open_url, press_key, read_text_file, screenshot, screenshot_window, scroll, type_text, verify_window, wait_for_process, wait_for_window, write_text_file
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.

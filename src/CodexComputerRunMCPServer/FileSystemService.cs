@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 namespace CodexComputerRunMCPServer;
@@ -10,6 +11,107 @@ namespace CodexComputerRunMCPServer;
 internal static class FileSystemService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    private const int MaxTextBytes = 5_000_000;
+
+    public static string ReadTextFile(string path, int maxBytes)
+    {
+        ValidateTextByteLimit(maxBytes);
+        var target = ResolveExistingFile(path);
+        using var stream = new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
+        var requestedBytes = (int)Math.Min(stream.Length, maxBytes);
+        var buffer = new byte[requestedBytes];
+        var bytesRead = 0;
+        while (bytesRead < buffer.Length)
+        {
+            var read = stream.Read(buffer, bytesRead, buffer.Length - bytesRead);
+            if (read == 0)
+            {
+                break;
+            }
+
+            bytesRead += read;
+        }
+
+        var content = DecodeUtf8Prefix(buffer.AsSpan(0, bytesRead));
+        return JsonSerializer.Serialize(new
+        {
+            operation = "read_text_file",
+            path = target,
+            encoding = "utf-8",
+            bytesRead,
+            truncated = stream.Length > bytesRead,
+            content,
+        }, JsonOptions);
+    }
+
+    public static string WriteTextFile(string path, string content, bool overwrite, bool dryRun)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        var target = ResolvePath(path);
+        if (Directory.Exists(target))
+        {
+            throw new IOException($"A directory already exists at the requested file path: {target}");
+        }
+
+        var parent = Path.GetDirectoryName(target);
+        if (string.IsNullOrWhiteSpace(parent) || !Directory.Exists(parent))
+        {
+            throw new DirectoryNotFoundException($"Parent directory not found: {parent ?? target}");
+        }
+
+        var existing = File.Exists(target);
+        if (existing && !overwrite)
+        {
+            throw new IOException($"Destination file already exists and overwrite=false: {target}");
+        }
+
+        var bytes = Utf8NoBom.GetBytes(content);
+        ValidateTextByteLimit(bytes.Length);
+        if (!dryRun)
+        {
+            var temporaryPath = Path.Combine(parent, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.tmp");
+            try
+            {
+                using (var stream = new FileStream(
+                    temporaryPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 64 * 1024,
+                    options: FileOptions.SequentialScan | FileOptions.WriteThrough))
+                {
+                    stream.Write(bytes);
+                    stream.Flush(flushToDisk: true);
+                }
+
+                if (existing)
+                {
+                    File.Replace(temporaryPath, target, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                }
+                else
+                {
+                    File.Move(temporaryPath, target);
+                }
+            }
+            finally
+            {
+                TryDeleteTemporaryFile(temporaryPath);
+            }
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            operation = "write_text_file",
+            path = target,
+            encoding = "utf-8",
+            bytes = bytes.Length,
+            overwrite,
+            dryRun,
+            changed = !dryRun,
+        }, JsonOptions);
+    }
 
     public static string ListDirectory(string path, bool recursive, int maxEntries)
     {
@@ -292,6 +394,17 @@ internal static class FileSystemService
         return resolved;
     }
 
+    private static string ResolveExistingFile(string path)
+    {
+        var resolved = ResolveExistingPath(path);
+        if (Directory.Exists(resolved))
+        {
+            throw new IOException($"A directory cannot be read as a text file: {resolved}");
+        }
+
+        return resolved;
+    }
+
     private static string ResolvePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -337,6 +450,42 @@ internal static class FileSystemService
         if (maxEntries is < 1 or > 5_000)
         {
             throw new ArgumentOutOfRangeException(nameof(maxEntries), "maxEntries must be between 1 and 5000.");
+        }
+    }
+
+    private static void ValidateTextByteLimit(int maxBytes)
+    {
+        if (maxBytes is < 1 or > MaxTextBytes)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxBytes), $"maxBytes must be between 1 and {MaxTextBytes}.");
+        }
+    }
+
+    private static string DecodeUtf8Prefix(ReadOnlySpan<byte> bytes)
+    {
+        var decoder = Utf8NoBom.GetDecoder();
+        var chars = new char[Utf8NoBom.GetMaxCharCount(bytes.Length)];
+        decoder.Convert(bytes, chars, flush: false, out _, out var charsUsed, out _);
+        var content = new string(chars, 0, charsUsed);
+        return content.Length > 0 && content[0] == '\uFEFF' ? content[1..] : content;
+    }
+
+    private static void TryDeleteTemporaryFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (IOException)
+        {
+            // The original destination remains intact if cleanup cannot complete.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The original destination remains intact if cleanup cannot complete.
         }
     }
 

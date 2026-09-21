@@ -256,6 +256,28 @@ public static class ComputerRunTools
         => InvokeFileObservation("list_directory", new { hasPath = !string.IsNullOrWhiteSpace(path), recursive, max_entries }, () => FileSystemService.ListDirectory(path, recursive, max_entries));
 
     /// <summary>
+    /// Reads a bounded UTF-8 text file without changing it.
+    /// </summary>
+    [McpServerTool]
+    [Description("Read a UTF-8 text file with a bounded byte limit. The result reports whether the content was truncated and never changes the file.")]
+    public static string read_text_file(
+        [Description("Existing UTF-8 text file path.")] string path,
+        [Description("Maximum bytes to read, from 1 to 5000000.")] int max_bytes = 1_000_000)
+        => InvokeFileObservation("read_text_file", new { hasPath = !string.IsNullOrWhiteSpace(path), max_bytes }, () => FileSystemService.ReadTextFile(path, max_bytes));
+
+    /// <summary>
+    /// Writes a bounded UTF-8 text file, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Write a UTF-8 text file using an atomic temporary-file replacement. dry_run defaults to true; overwrite must be explicitly true for an existing file.")]
+    public static string write_text_file(
+        [Description("Destination text file path. Its parent directory must already exist.")] string path,
+        [Description("UTF-8 text content to write.")] string content,
+        [Description("Allow replacing an existing file.")] bool overwrite = false,
+        [Description("When true, only return the plan; when false, write the file.")] bool dry_run = true)
+        => InvokeFileMutation("write_text_file", new { hasPath = !string.IsNullOrWhiteSpace(path), contentLength = content?.Length ?? 0, overwrite, dry_run }, dry_run, () => FileSystemService.WriteTextFile(path, content ?? string.Empty, overwrite, dry_run));
+
+    /// <summary>
     /// Creates a directory, or returns a dry-run plan by default.
     /// </summary>
     [McpServerTool]

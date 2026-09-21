@@ -25,7 +25,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 
 - Prefer the `mcp__codex_computer_run__` namespace when available.
 - If tools are deferred, search for `ComputerRun`, `codex computer run`, or `desktop screenshot mouse keyboard` and choose the namespace that exposes the complete tool set.
-- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `verify_window`, `wait_for_window`, `activate_window`, `close_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, `type_text`, `list_directory`, `create_directory`, `copy_path`, `move_path`, `delete_path`, `git_status`, `git_init`, `git_clone`, `git_create_branch`, `git_commit`, `list_processes`, `wait_for_process`, `launch_application`, and `open_url`.
+- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `verify_window`, `wait_for_window`, `activate_window`, `close_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, `type_text`, `list_directory`, `read_text_file`, `create_directory`, `copy_path`, `move_path`, `delete_path`, `write_text_file`, `git_status`, `git_init`, `git_clone`, `git_create_branch`, `git_commit`, `list_processes`, `wait_for_process`, `launch_application`, and `open_url`.
 - If the MCP tools are unavailable, state that the Computer Run server is not configured in the current session instead of simulating desktop interaction with unrelated shell commands.
 
 ## Platform Notes
@@ -58,6 +58,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
     - Use `create_directory`, `copy_path`, `move_path`, and `delete_path` first with their default `dry_run:true`, inspect the normalized plan, and only then apply the exact requested mutation with `dry_run:false`.
     - Use `git_status` before repository changes. Use `git_init`, `git_clone`, `git_create_branch`, and `git_commit` in dry-run mode first; they never push or delete a remote repository.
     - Use `list_processes` or `wait_for_process` to observe application recovery. Use `launch_application` and `open_url` in dry-run mode first; only apply the exact executable/URL after confirming the requested launch.
+    - Use `read_text_file` for bounded UTF-8 inspection. Use `write_text_file` in dry-run mode first and require `overwrite:true` for an existing file; it writes through a temporary file and replaces the destination atomically when applied.
 4. Verify after meaningful actions:
    - In normal mode, use `screenshot` after navigation, clicks, scrolls, or text entry when the resulting state matters.
    - In developer mode, do not capture after every low-risk click when the target and action sequence are already known. Capture after navigation, a meaningful UI transition, a failed action, an unexpected focus change, or before/after a potentially data-bearing action.

@@ -31,9 +31,9 @@ public class McpIntegrationTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(tools.Length).IsEqualTo(29);
+        await Assert.That(tools.Length).IsEqualTo(31);
         await Assert.That(string.Join("|", tools)).IsEqualTo(
-            "activate_window|click|close_window|copy_path|create_directory|cursor_position|delete_path|find_windows|git_clone|git_commit|git_create_branch|git_init|git_status|hotkey|launch_application|list_directory|list_processes|list_windows|move_mouse|move_path|open_url|press_key|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_process|wait_for_window");
+            "activate_window|click|close_window|copy_path|create_directory|cursor_position|delete_path|find_windows|git_clone|git_commit|git_create_branch|git_init|git_status|hotkey|launch_application|list_directory|list_processes|list_windows|move_mouse|move_path|open_url|press_key|read_text_file|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_process|wait_for_window|write_text_file");
     }
 
     [Test]
@@ -74,6 +74,8 @@ public class McpIntegrationTests
         _ = ComputerRunTools.wait_for_window(process_name: "notepad", title_contains: "untitled", foreground_only: false, include_minimized: true, timeout_ms: 0, poll_ms: 25);
         _ = ComputerRunTools.close_window(100, timeout_ms: 0);
         _ = ComputerRunTools.list_directory(Path.GetTempPath(), max_entries: 1);
+        _ = ComputerRunTools.read_text_file(Path.Combine(FindRepositoryRoot(), "README.md"), max_bytes: 128);
+        _ = ComputerRunTools.write_text_file(Path.Combine(Path.GetTempPath(), "codex-computer-run-text-dry-run.txt"), "dry run", dry_run: true);
         _ = ComputerRunTools.create_directory(Path.Combine(Path.GetTempPath(), "codex-computer-run-dry-run"), dry_run: true);
         _ = ComputerRunTools.copy_path(AppContext.BaseDirectory, Path.Combine(Path.GetTempPath(), "codex-computer-run-copy-dry-run"), dry_run: true);
         _ = ComputerRunTools.move_path(AppContext.BaseDirectory, Path.Combine(Path.GetTempPath(), "codex-computer-run-move-dry-run"), dry_run: true);
