@@ -399,19 +399,19 @@ dotnet build .\CodexComputerRunMCPServer.slnx --configuration Release --no-resto
 Windows PowerShell:
 
 ```powershell
-dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release
+dotnet test --project .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release
 ```
 
 Linux or macOS:
 
 ```bash
-dotnet test ./src/CodexComputerRunMCPServer.Tests/CodexComputerRunMCPServer.Tests.csproj --configuration Release
+dotnet test --project ./src/CodexComputerRunMCPServer.Tests/CodexComputerRunMCPServer.Tests.csproj --configuration Release
 ```
 
 Coverage with TUnit/Microsoft Testing Platform:
 
 ```powershell
-dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release -- --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura --results-directory .\artifacts\test-results
+dotnet test --project .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release -- --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura --results-directory .\artifacts\test-results
 ```
 
 Current verification:
@@ -461,3 +461,9 @@ Once configured, you can ask things like:
 ## Safety Notes
 
 This server controls the active desktop. Mouse, keyboard, and clipboard actions affect the currently focused application. Use it only in a trusted desktop session and pair destructive UI actions with screenshots or window checks first.
+
+### Interaction policy
+
+The bundled Codex Skill distinguishes reversible interface maintenance from data-bearing or destructive actions. When a user explicitly asks to debug a named application, developer mode can continue through low-risk operations such as switching tabs, opening DevTools, reloading an identified page, dismissing a modal, or closing a confirmed empty tab after the target window has been identified. It should not require a separate confirmation for every click in a known sequence.
+
+Developer mode does not remove target-window checks or authorize sending messages, submitting forms, joining calls, deleting data, making purchases, or changing account and security settings. It also must not assume that a tab is empty when it contains unsent text, an upload, an active call, recording, streaming, media playback, or another pending operation.

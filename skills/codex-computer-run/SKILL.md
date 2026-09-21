@@ -7,7 +7,19 @@ description: Use this skill when Codex needs to operate or inspect a signed-in d
 
 ## Overview
 
-Use the Codex Computer Run MCP server as an observation-first control layer for a real desktop session. Its tools affect the active machine, so inspect context before acting and verify after actions that can change state.
+Use the Codex Computer Run MCP server as a context-aware control layer for a real desktop session. Its tools affect the active machine, so identify the intended target before acting and verify after actions that can change meaningful state.
+
+## Interaction Policy
+
+Use the least restrictive policy that still matches the user's request:
+
+- **Normal mode**: identify the target application before interacting with it; verify meaningful state changes, ambiguous transitions, and failures.
+- **Developer mode**: when the user has explicitly asked to debug or inspect a named application, treat reversible UI operations as low-risk after the target has been identified once. This includes switching tabs, opening DevTools, reloading a page, focusing a window, closing an explicitly identified empty tab, changing layout, and dismissing a modal.
+- Do not ask for an additional confirmation for each low-risk operation merely because it is a click, key press, reload, or tab close. Check the target window and the current UI state once, then continue with the requested sequence.
+- Keep explicit confirmation for actions that can transmit, destroy, purchase, authenticate, or alter user data or account/security state. Examples include sending messages, joining calls, submitting forms, deleting files or records, changing account settings, and making purchases.
+- Never infer that a tab is empty when the screenshot or window state shows user-entered text, an unsent message, an upload, an active call, recording, streaming, media playback, or another pending operation.
+
+The policy changes how much repetitive confirmation and screenshot checking is needed; it does not authorize acting on an unidentified foreground application or bypass operating-system permissions.
 
 ## Tool Discovery
 
@@ -40,8 +52,9 @@ Use the Codex Computer Run MCP server as an observation-first control layer for 
    - Use `hotkey` for shortcuts such as `ctrl+l`, `ctrl+shift+p`, `alt+tab`, or `ctrl+shift+escape`.
    - Use `type_text` for text entry; it pastes Unicode through the clipboard and is faster and more reliable than repeated key presses.
 4. Verify after meaningful actions:
-   - Use `screenshot` after navigation, clicks, scrolls, or text entry when the resulting state matters.
-   - Use `list_windows` again after task switching or launching apps.
+   - In normal mode, use `screenshot` after navigation, clicks, scrolls, or text entry when the resulting state matters.
+   - In developer mode, do not capture after every low-risk click when the target and action sequence are already known. Capture after navigation, a meaningful UI transition, a failed action, an unexpected focus change, or before/after a potentially data-bearing action.
+   - Use `list_windows` again after task switching or launching apps, or whenever the foreground target becomes ambiguous.
 
 ## Screenshots
 
@@ -52,7 +65,8 @@ Use the Codex Computer Run MCP server as an observation-first control layer for 
 ## Safety Rules
 
 - Remember that mouse, keyboard, and clipboard actions affect the user's signed-in desktop.
-- Do not perform destructive UI actions, submit forms, send messages, make purchases, delete files, or change account/security settings unless the user explicitly asked for that exact outcome.
+- Do not perform data-bearing or destructive UI actions, submit forms, send messages, make purchases, delete files, or change account/security settings unless the user explicitly asked for that exact outcome.
+- Treat reversible interface maintenance and debugging operations as separate from destructive data operations. Closing a confirmed empty tab, opening DevTools, reloading an identified page, dismissing a modal, or switching tabs is not automatically a destructive action.
 - Confirm the intended foreground app with `list_windows` or `screenshot` before typing or pressing shortcuts that could affect the wrong application.
 - Treat `type_text` as clipboard-changing; use it only when pasting into the focused target is intended.
 - Keep delays short but use the optional `delay` parameter after actions that trigger UI transitions.
