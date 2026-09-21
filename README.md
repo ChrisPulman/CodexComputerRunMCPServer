@@ -3,10 +3,10 @@
 <!-- mcp-name: io.github.chrispulman/codex-computer-run-mcp-server -->
 
 Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct control over a signed-in desktop session.
-It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode text entry, cursor position, and metadata-based window targeting, plus a bundled Codex Skill for safe desktop-use workflows.
+It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode text entry, metadata-based window targeting, bounded filesystem organization, and local Git workflows, plus a bundled Codex Skill for safe desktop-use workflows.
 
-It is implemented in C# on `net10.0` using `ModelContextProtocol` `1.3.0`.
-The current package and MCP manifest version is `1.1.0`.
+It is implemented in C# on `net10.0` using `ModelContextProtocol` `2.2.0`.
+The current package and MCP manifest version is `1.2.0`.
 The package targets plain `net10.0` so it can be distributed as a .NET tool. Windows uses native Win32 APIs; Linux and macOS use best-effort command-backed adapters.
 
 ## Quick Install
@@ -44,7 +44,7 @@ Windows remains the primary implementation. Linux and macOS support keeps the sa
 
 | Area | Current behavior |
 |------|------------------|
-| Version | `1.1.0` |
+| Version | `1.2.0` |
 | Target framework | `net10.0` |
 | Windows | Native Win32 implementation with virtual-screen capture, direct Unicode `SendInput`, cursor position, and visible top-level window enumeration |
 | Linux | Command-backed adapter using `xdotool` for pointer and keyboard input, `xrandr` for display-geometry fallback, `wmctrl` or `xdotool` for windows, screenshot command fallbacks, and text-entry command fallbacks |
