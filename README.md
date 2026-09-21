@@ -284,7 +284,25 @@ Brings a previously enumerated window to the foreground by its native handle.
 - `handle` - native window handle returned by `list_windows`.
 - `restore` *(default: `true`)* - restore the window first when it is minimized.
 
-**When to use:** Call `list_windows` first, verify the process and title, then activate the exact handle before sending input. Windows uses the native window handle; Linux uses `wmctrl` or `xdotool`; the current macOS adapter reports a clear unsupported error because its window listing does not expose stable native handles.
+**When to use:** Call `list_windows` first, verify the process and title, then activate the exact handle before sending input. Windows uses the native window handle and waits until the OS reports that handle as foreground; Linux uses `wmctrl` or `xdotool`; the current macOS adapter reports a clear unsupported error because its window listing does not expose stable native handles.
+
+---
+
+### `close_window`
+
+Requests a graceful close for one exact top-level window handle. The operation posts the platform's normal close request and then checks whether that handle disappeared. It never terminates the owning process. If the application presents a save dialog or rejects the request, the result contains `closed:false` and explains that the window is still present.
+
+**Parameters:**
+- `handle` - native window handle returned by `list_windows` or `find_windows`.
+- `timeout_ms` *(optional)* - bounded wait from 0 to 5000 milliseconds; defaults to 1000.
+
+**When to use:** Use only after identifying the exact window and confirming that closing it is intended. Prefer this over sending `alt+f4`, because a stale foreground can route a global shortcut to another application.
+
+---
+
+### Targeted keyboard input
+
+`press_key`, `hotkey`, and `type_text` accept an optional `target_handle`. When supplied, the server re-enumerates that exact window immediately before injecting input and sends nothing if it is missing, minimized, or no longer foreground. This turns a focus race into a safe, actionable error. The recommended sequence is `find_windows` → `activate_window` → input with `target_handle`.
 
 ## Performance And Integration Notes
 
@@ -293,6 +311,9 @@ Brings a previously enumerated window to the foreground by its native handle.
 - Windows mouse and keyboard actions use batched `SendInput` calls instead of legacy per-event APIs.
 - Windows `hotkey` presses all keys down and releases them in reverse order in one batch.
 - Windows text entry emits direct Unicode input and leaves the clipboard unchanged.
+- Windows activation uses a bounded foreground-stabilization check; activation is reported as failed when the requested handle does not actually become foreground.
+- Keyboard input can be bound to an exact `target_handle`; a failed foreground check aborts before `SendInput`.
+- `close_window` uses a graceful, handle-directed close request and verifies the postcondition instead of sending a global shortcut or terminating a process.
 - Window enumeration uses at most one retry for observation-only queries; input-changing operations are never retried automatically.
 - Windows visible window enumeration caches process names by PID during each call.
 - Startup enables per-monitor DPI awareness on Windows for correct coordinate and screenshot behavior on mixed-DPI displays.
@@ -518,10 +539,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 14 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 15 tools:
 
 ```text
-activate_window, scroll, hotkey, type_text, screenshot, list_windows, find_windows, screenshot_window, verify_window, wait_for_window, click, move_mouse, press_key, cursor_position
+activate_window, close_window, scroll, hotkey, type_text, screenshot, list_windows, find_windows, screenshot_window, verify_window, wait_for_window, click, move_mouse, press_key, cursor_position
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.

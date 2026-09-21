@@ -31,9 +31,9 @@ public class McpIntegrationTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(tools.Length).IsEqualTo(14);
+        await Assert.That(tools.Length).IsEqualTo(15);
         await Assert.That(string.Join("|", tools)).IsEqualTo(
-            "activate_window|click|cursor_position|find_windows|hotkey|list_windows|move_mouse|press_key|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_window");
+            "activate_window|click|close_window|cursor_position|find_windows|hotkey|list_windows|move_mouse|press_key|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_window");
     }
 
     [Test]
@@ -72,8 +72,9 @@ public class McpIntegrationTests
         _ = ComputerRunTools.screenshot_window(100, include_image: false);
         _ = ComputerRunTools.verify_window(100, process_name: "notepad", title_contains: "untitled", require_foreground: true, allow_minimized: false);
         _ = ComputerRunTools.wait_for_window(process_name: "notepad", title_contains: "untitled", foreground_only: false, include_minimized: true, timeout_ms: 0, poll_ms: 25);
+        _ = ComputerRunTools.close_window(100, timeout_ms: 0);
 
-        await Assert.That(service.Calls).IsEqualTo(14);
+        await Assert.That(service.Calls).IsEqualTo(15);
     }
 
     [Test]
@@ -151,19 +152,19 @@ public class McpIntegrationTests
             return "scroll";
         }
 
-        public string PressKey(string key, double duration, double? delay)
+        public string PressKey(string key, double duration, double? delay, long? targetHandle)
         {
             Calls++;
             return "press";
         }
 
-        public string Hotkey(string keys, double? delay)
+        public string Hotkey(string keys, double? delay, long? targetHandle)
         {
             Calls++;
             return "hotkey";
         }
 
-        public string TypeText(string text, double? delay)
+        public string TypeText(string text, double? delay, long? targetHandle)
         {
             Calls++;
             return "type";
@@ -209,6 +210,12 @@ public class McpIntegrationTests
         {
             Calls++;
             return "activate";
+        }
+
+        public string CloseWindow(long handle, int timeoutMilliseconds)
+        {
+            Calls++;
+            return "close";
         }
     }
 }

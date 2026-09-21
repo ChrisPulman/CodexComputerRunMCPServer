@@ -1,6 +1,6 @@
 ---
 name: codex-computer-run
-description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, metadata-based window targeting, bounded window waits, pre/post window verification, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text entry into focused applications.
+description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, metadata-based window targeting, bounded window waits, pre/post window verification, safe graceful window closing, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text entry into focused applications.
 ---
 
 # Codex Computer Run
@@ -25,7 +25,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 
 - Prefer the `mcp__codex_computer_run__` namespace when available.
 - If tools are deferred, search for `ComputerRun`, `codex computer run`, or `desktop screenshot mouse keyboard` and choose the namespace that exposes the complete tool set.
-- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `verify_window`, `wait_for_window`, `activate_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`.
+- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `verify_window`, `wait_for_window`, `activate_window`, `close_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`.
 - If the MCP tools are unavailable, state that the Computer Run server is not configured in the current session instead of simulating desktop interaction with unrelated shell commands.
 
 ## Platform Notes
@@ -39,7 +39,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 1. Observe before acting:
    - Use `list_windows` or `find_windows` to identify visible applications and likely targets.
    - Use `verify_window` before input when the handle may be stale, and `wait_for_window` after launching or recovering a named application.
-   - Use `activate_window` with a handle returned by `list_windows` or `find_windows` when the intended target is not already foreground.
+    - Use `activate_window` with a handle returned by `list_windows` or `find_windows` when the intended target is not already foreground; wait for its success result before continuing.
    - Use `screenshot_window` when a target handle and bounds are known; use full `screenshot` when the wider desktop context matters.
    - Use `cursor_position` before relying on the current pointer location.
 2. Plan in absolute desktop coordinates:
@@ -51,8 +51,9 @@ The policy changes how much repetitive confirmation and screenshot checking is n
    - Use `click` for buttons, menus, tabs, selections, and context menus.
    - Use `scroll` for pages, lists, combo boxes, and scrollable panes.
    - Use `press_key` for one key such as `enter`, `tab`, `escape`, `f5`, arrows, or a single character.
-   - Use `hotkey` for shortcuts such as `ctrl+l`, `ctrl+shift+p`, `alt+tab`, or `ctrl+shift+escape`.
-   - Use `type_text` for text entry. Windows injects Unicode directly without changing the clipboard; Linux/macOS may use their native clipboard or text-entry fallback.
+    - Use `hotkey` for shortcuts such as `ctrl+l`, `ctrl+shift+p`, `alt+tab`, or `ctrl+shift+escape`. When a window handle is known, pass it as `target_handle`.
+    - Use `type_text` for text entry and pass `target_handle` whenever focus matters. Windows injects Unicode directly without changing the clipboard; Linux/macOS may use their native clipboard or text-entry fallback.
+    - Use `close_window` for an explicitly identified window instead of a global `alt+f4`; it requests a graceful close and reports if a save prompt keeps the window alive.
 4. Verify after meaningful actions:
    - In normal mode, use `screenshot` after navigation, clicks, scrolls, or text entry when the resulting state matters.
    - In developer mode, do not capture after every low-risk click when the target and action sequence are already known. Capture after navigation, a meaningful UI transition, a failed action, an unexpected focus change, or before/after a potentially data-bearing action.
@@ -70,6 +71,8 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 - Do not perform data-bearing or destructive UI actions, submit forms, send messages, make purchases, delete files, or change account/security settings unless the user explicitly asked for that exact outcome.
 - Treat reversible interface maintenance and debugging operations as separate from destructive data operations. Closing a confirmed empty tab, opening DevTools, reloading an identified page, dismissing a modal, or switching tabs is not automatically a destructive action.
 - Confirm the intended foreground app with `list_windows` or `screenshot` before typing or pressing shortcuts that could affect the wrong application.
+- When a native window handle is available, pass it as `target_handle` to `press_key`, `hotkey`, or `type_text`; the server aborts rather than routing input to a different foreground app.
+- Do not use a global `alt+f4` as a substitute for `close_window` when the intended window can be identified by handle.
 - On Windows, `type_text` does not change the clipboard. On Linux/macOS, check the platform fallback before using it when preserving clipboard contents matters.
 - Keep delays short but use the optional `delay` parameter after actions that trigger UI transitions.
 - The server may retry observation-only window enumeration once, but never automatically retries clicks, key presses, hotkeys, scrolling, or text entry.

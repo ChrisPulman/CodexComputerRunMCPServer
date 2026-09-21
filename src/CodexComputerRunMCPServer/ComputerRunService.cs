@@ -59,7 +59,7 @@ internal interface IComputerRunService
     /// <param name="duration">Hold duration in seconds. Negative values are clamped to 0.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message.</returns>
-    string PressKey(string key, double duration, double? delay);
+    string PressKey(string key, double duration, double? delay, long? targetHandle);
 
     /// <summary>
     /// Presses a hotkey combination.
@@ -67,7 +67,7 @@ internal interface IComputerRunService
     /// <param name="keys">Hotkey expression containing one or more key names.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message.</returns>
-    string Hotkey(string keys, double? delay);
+    string Hotkey(string keys, double? delay, long? targetHandle);
 
     /// <summary>
     /// Enters text into the focused application using the platform's preferred text-entry path.
@@ -75,7 +75,7 @@ internal interface IComputerRunService
     /// <param name="text">Text to enter. <see langword="null"/> is treated as an empty string.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message with entered character count.</returns>
-    string TypeText(string text, double? delay);
+    string TypeText(string text, double? delay, long? targetHandle);
 
     /// <summary>
     /// Gets the current cursor position.
@@ -117,6 +117,11 @@ internal interface IComputerRunService
     /// <param name="restore">Whether a minimized window should be restored before focusing it.</param>
     /// <returns>A human-readable operation result message.</returns>
     string ActivateWindow(long handle, bool restore);
+
+    /// <summary>
+    /// Requests a graceful close of one exact top-level window and reports whether it disappeared.
+    /// </summary>
+    string CloseWindow(long handle, int timeoutMilliseconds);
 }
 
 /// <summary>
@@ -215,10 +220,11 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string PressKey(string key, double duration, double? delay)
+    public string PressKey(string key, double duration, double? delay, long? targetHandle)
     {
         var keyChord = KeyboardInput.ResolveKeyChord(key, platform.KeyScan);
         var holdDuration = Delay.FromSeconds(Math.Max(0, duration), nameof(duration));
+        EnsureInputTargetIsForeground(targetHandle);
         platform.PressKey(keyChord, holdDuration);
 
         Delay.Sleep(delay);
@@ -226,9 +232,10 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string Hotkey(string keys, double? delay)
+    public string Hotkey(string keys, double? delay, long? targetHandle)
     {
         var virtualKeys = KeyboardInput.ResolveHotkey(keys, platform.KeyScan);
+        EnsureInputTargetIsForeground(targetHandle);
         platform.PressHotkey(virtualKeys);
 
         Delay.Sleep(delay);
@@ -236,9 +243,10 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string TypeText(string text, double? delay)
+    public string TypeText(string text, double? delay, long? targetHandle)
     {
         var enteredText = text ?? string.Empty;
+        EnsureInputTargetIsForeground(targetHandle);
         platform.TypeText(enteredText);
 
         Delay.Sleep(delay);
@@ -413,6 +421,72 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
         return $"Activated window {handle}.";
     }
 
+    /// <inheritdoc />
+    public string CloseWindow(long handle, int timeoutMilliseconds)
+    {
+        if (handle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "handle must be a positive native window handle.");
+        }
+
+        if (timeoutMilliseconds is < 0 or > MaxWindowCloseWaitMilliseconds)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(timeoutMilliseconds),
+                $"timeoutMilliseconds must be between 0 and {MaxWindowCloseWaitMilliseconds}.");
+        }
+
+        var window = ListWindowsWithSingleRetry(WindowEnumerationLimit)
+            .FirstOrDefault(candidate => candidate.Handle == handle);
+        if (window is null)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                requested = false,
+                closed = true,
+                handle,
+                reason = "not_found",
+            }, JsonOptions);
+        }
+
+        platform.RequestCloseWindow(handle);
+        var stopwatch = Stopwatch.StartNew();
+        while (true)
+        {
+            var stillPresent = ListWindowsWithSingleRetry(WindowEnumerationLimit)
+                .Any(candidate => candidate.Handle == handle);
+            if (!stillPresent)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    requested = true,
+                    closed = true,
+                    handle,
+                    waitedMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                    reason = "closed",
+                }, JsonOptions);
+            }
+
+            if (stopwatch.ElapsedMilliseconds >= timeoutMilliseconds)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    requested = true,
+                    closed = false,
+                    handle,
+                    waitedMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                    reason = "still_present",
+                    note = "The window may be waiting for a save decision or may have rejected the graceful close request.",
+                }, JsonOptions);
+            }
+
+            var remaining = TimeSpan.FromMilliseconds(timeoutMilliseconds) - stopwatch.Elapsed;
+            Thread.Sleep(remaining < TimeSpan.FromMilliseconds(MinWindowPollMilliseconds)
+                ? remaining
+                : TimeSpan.FromMilliseconds(MinWindowPollMilliseconds));
+        }
+    }
+
     /// <summary>
     /// Resolves an optional file path by expanding environment variables and creating parent directories.
     /// </summary>
@@ -467,6 +541,37 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     private static string? NormalizeFilter(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    /// <summary>
+    /// Verifies an optional native window handle immediately before keyboard input.
+    /// A failed check aborts without sending any input, preventing a stale focus from
+    /// routing a destructive shortcut to another application.
+    /// </summary>
+    private void EnsureInputTargetIsForeground(long? targetHandle)
+    {
+        if (targetHandle is null)
+        {
+            return;
+        }
+
+        if (targetHandle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(targetHandle), "targetHandle must be a positive native window handle.");
+        }
+
+        var target = ListWindowsWithSingleRetry(WindowEnumerationLimit)
+            .FirstOrDefault(candidate => candidate.Handle == targetHandle.Value);
+        if (target is null)
+        {
+            throw new InvalidOperationException($"Target window {targetHandle.Value} was not found. No keyboard input was sent.");
+        }
+
+        if (target.IsMinimized == true || target.IsForeground != true)
+        {
+            throw new InvalidOperationException(
+                $"Target window {targetHandle.Value} is not the verified foreground window. No keyboard input was sent; activate it and retry with targetHandle.");
+        }
+    }
+
     private IReadOnlyList<WindowInfo> FindMatchingWindowInfos(
         string? processName,
         string? titleContains,
@@ -500,6 +605,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
 
     private const int WindowEnumerationLimit = 256;
     private const int MaxWindowWaitMilliseconds = 30_000;
+    private const int MaxWindowCloseWaitMilliseconds = 5_000;
     private const int MinWindowPollMilliseconds = 25;
     private const int MaxWindowPollMilliseconds = 1_000;
 
@@ -629,6 +735,11 @@ internal interface IComputerRunPlatform
     /// <param name="handle">Native window handle returned by the platform.</param>
     /// <param name="restore">Whether a minimized window should be restored first.</param>
     void ActivateWindow(long handle, bool restore);
+
+    /// <summary>
+    /// Requests a graceful close for one exact native window handle.
+    /// </summary>
+    void RequestCloseWindow(long handle);
 
     /// <summary>
     /// Resolves a character to a platform-specific key scan code.

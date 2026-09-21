@@ -94,6 +94,9 @@ internal static partial class NativeMethods
     /// </summary>
     public const int ShowWindowRestore = 9;
 
+    /// <summary>Window message requesting a graceful close.</summary>
+    public const uint WindowMessageClose = 0x0010;
+
     /// <summary>
     /// Callback delegate used by <see cref="EnumWindows"/> to enumerate top-level windows.
     /// </summary>
@@ -372,6 +375,31 @@ internal static partial class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    /// <summary>
+    /// Brings a window to the top of the Z order without changing its size or position.
+    /// </summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool BringWindowToTop(IntPtr hWnd);
+
+    /// <summary>Sets the active window for the calling thread.</summary>
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetActiveWindow(IntPtr hWnd);
+
+    /// <summary>Returns the identifier of the calling thread.</summary>
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+
+    /// <summary>Temporarily shares input state between two GUI threads.</summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool attach);
+
+    /// <summary>Posts a message to a window without changing the foreground window.</summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PostMessage(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
 
     /// <summary>
     /// Gets the length, in characters, of the specified window's title text.

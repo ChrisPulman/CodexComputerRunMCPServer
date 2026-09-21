@@ -48,6 +48,9 @@ internal sealed class UnsupportedComputerRunPlatform(string osDescription) : ICo
     public void ActivateWindow(long handle, bool restore) => throw CreateException();
 
     /// <inheritdoc />
+    public void RequestCloseWindow(long handle) => throw CreateException();
+
+    /// <inheritdoc />
     public short KeyScan(char character) => KeyboardInputDefaults.KeyScan(character);
 
     private PlatformNotSupportedException CreateException()

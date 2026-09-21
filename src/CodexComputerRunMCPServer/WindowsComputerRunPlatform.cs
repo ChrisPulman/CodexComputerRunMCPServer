@@ -111,9 +111,50 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
             _ = NativeMethods.ShowWindow(window, NativeMethods.ShowWindowRestore);
         }
 
-        if (!NativeMethods.SetForegroundWindow(window))
+        var currentThread = NativeMethods.GetCurrentThreadId();
+        var targetThread = NativeMethods.GetWindowThreadProcessId(window, out _);
+        var attached = targetThread != 0
+            && targetThread != currentThread
+            && NativeMethods.AttachThreadInput(currentThread, targetThread, attach: true);
+
+        try
         {
-            ThrowLastWin32Error("SetForegroundWindow failed");
+            _ = NativeMethods.BringWindowToTop(window);
+            _ = NativeMethods.SetActiveWindow(window);
+            if (!NativeMethods.SetForegroundWindow(window))
+            {
+                ThrowLastWin32Error("SetForegroundWindow failed");
+            }
+
+            if (!WaitForForeground(window, TimeSpan.FromMilliseconds(1500)))
+            {
+                var actual = NativeMethods.GetForegroundWindow();
+                throw new InvalidOperationException(
+                    $"Windows accepted activation for {handle}, but it did not become foreground. " +
+                    $"The current foreground handle is {actual.ToInt64()}. No follow-up input should be sent.");
+            }
+        }
+        finally
+        {
+            if (attached)
+            {
+                _ = NativeMethods.AttachThreadInput(currentThread, targetThread, attach: false);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public void RequestCloseWindow(long handle)
+    {
+        var window = new IntPtr(handle);
+        if (handle <= 0 || !NativeMethods.IsWindow(window))
+        {
+            throw new ArgumentException($"Window handle {handle} is not a valid open window.", nameof(handle));
+        }
+
+        if (!NativeMethods.PostMessage(window, NativeMethods.WindowMessageClose, IntPtr.Zero, IntPtr.Zero))
+        {
+            ThrowLastWin32Error("WM_CLOSE request failed");
         }
     }
 
@@ -463,6 +504,22 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
         {
             ThrowLastWin32Error("SendInput failed");
         }
+    }
+
+    private static bool WaitForForeground(IntPtr window, TimeSpan timeout)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        while (NativeMethods.GetForegroundWindow() != window)
+        {
+            if (stopwatch.Elapsed >= timeout)
+            {
+                return false;
+            }
+
+            Thread.Sleep(15);
+        }
+
+        return true;
     }
 
     /// <summary>

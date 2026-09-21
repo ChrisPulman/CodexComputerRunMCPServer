@@ -183,11 +183,11 @@ public class ComputerRunLifecycleTests
 
         public string Scroll(int amount, int? x, int? y, double? delay) => throw new NotSupportedException();
 
-        public string PressKey(string key, double duration, double? delay) => throw new NotSupportedException();
+        public string PressKey(string key, double duration, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string Hotkey(string keys, double? delay) => throw new NotSupportedException();
+        public string Hotkey(string keys, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string TypeText(string text, double? delay) => throw new NotSupportedException();
+        public string TypeText(string text, double? delay, long? targetHandle) => throw new NotSupportedException();
 
         public string ListWindows(int limit) => throw new NotSupportedException();
 
@@ -203,6 +203,8 @@ public class ComputerRunLifecycleTests
             => throw new NotSupportedException();
 
         public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
+
+        public string CloseWindow(long handle, int timeoutMilliseconds) => throw new NotSupportedException();
     }
 
     private sealed class ControlLeaseInspectingService : IComputerRunService
@@ -230,11 +232,11 @@ public class ComputerRunLifecycleTests
 
         public string Scroll(int amount, int? x, int? y, double? delay) => throw new NotSupportedException();
 
-        public string PressKey(string key, double duration, double? delay) => throw new NotSupportedException();
+        public string PressKey(string key, double duration, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string Hotkey(string keys, double? delay) => throw new NotSupportedException();
+        public string Hotkey(string keys, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string TypeText(string text, double? delay) => throw new NotSupportedException();
+        public string TypeText(string text, double? delay, long? targetHandle) => throw new NotSupportedException();
 
         public string ListWindows(int limit) => throw new NotSupportedException();
 
@@ -250,5 +252,7 @@ public class ComputerRunLifecycleTests
             => throw new NotSupportedException();
 
         public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
+
+        public string CloseWindow(long handle, int timeoutMilliseconds) => throw new NotSupportedException();
     }
 }

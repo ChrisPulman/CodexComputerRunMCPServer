@@ -119,6 +119,25 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
     }
 
     /// <inheritdoc />
+    public void RequestCloseWindow(long handle)
+    {
+        var windowId = $"0x{handle:X}";
+        if (CommandRunner.CommandExists("wmctrl"))
+        {
+            _ = RunRequired("wmctrl", ["-ic", windowId]);
+            return;
+        }
+
+        if (CommandRunner.CommandExists("xdotool"))
+        {
+            _ = RunXdotool(["windowclose", handle.ToString()]);
+            return;
+        }
+
+        throw MissingDependency(PlatformName, "wmctrl", "xdotool");
+    }
+
+    /// <inheritdoc />
     public void Click(MouseButton button, int clicks, TimeSpan interval)
     {
         var buttonNumber = button switch

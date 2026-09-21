@@ -30,6 +30,8 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public List<(long Handle, bool Restore)> ActivatedWindows { get; } = [];
 
+    public List<long> CloseRequests { get; } = [];
+
     public int ListWindowsFailuresRemaining { get; set; }
 
     public List<WindowInfo> Windows { get; } =
@@ -88,6 +90,12 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
     }
 
     public void ActivateWindow(long handle, bool restore) => ActivatedWindows.Add((handle, restore));
+
+    public void RequestCloseWindow(long handle)
+    {
+        CloseRequests.Add(handle);
+        Windows.RemoveAll(window => window.Handle == handle);
+    }
 
     public short KeyScan(char character) => KeyScans.TryGetValue(character, out var scan) ? scan : (short)-1;
 }

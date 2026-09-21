@@ -67,6 +67,11 @@ internal sealed class MacComputerRunPlatform(IExternalCommandRunner? commandRunn
             "macOS window enumeration does not expose a stable native handle for activation in this adapter.");
 
     /// <inheritdoc />
+    public void RequestCloseWindow(long handle)
+        => throw new PlatformNotSupportedException(
+            "macOS window enumeration does not expose a stable native handle for graceful close in this adapter.");
+
+    /// <inheritdoc />
     public void Click(MouseButton button, int clicks, TimeSpan interval)
     {
         if (button == MouseButton.Middle)

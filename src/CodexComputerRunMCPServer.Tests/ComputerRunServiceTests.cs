@@ -146,9 +146,9 @@ public class ComputerRunServiceTests
         var platform = new TestComputerRunPlatform();
         var service = new ComputerRunService(platform);
 
-        var keyResult = service.PressKey("?", duration: 0.02, delay: null);
-        var hotkeyResult = service.Hotkey("ctrl+l", delay: null);
-        var typeResult = service.TypeText("hello", delay: null);
+        var keyResult = service.PressKey("?", duration: 0.02, delay: null, targetHandle: null);
+        var hotkeyResult = service.Hotkey("ctrl+l", delay: null, targetHandle: null);
+        var typeResult = service.TypeText("hello", delay: null, targetHandle: null);
 
         await Assert.That(keyResult).Contains("Pressed ?");
         await Assert.That(hotkeyResult).Contains("ctrl+l");
@@ -292,6 +292,47 @@ public class ComputerRunServiceTests
         var service = new ComputerRunService(new TestComputerRunPlatform());
 
         await Assert.That(() => service.ActivateWindow(0, restore: true)).Throws<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
+    public async Task KeyboardInput_WithTargetHandle_AbortsWhenTargetIsNotForeground()
+    {
+        var platform = new TestComputerRunPlatform();
+        var service = new ComputerRunService(platform);
+
+        await Assert.That(() => service.Hotkey("alt+f4", delay: null, targetHandle: 101))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("No keyboard input was sent");
+
+        await Assert.That(platform.Hotkeys).IsEmpty();
+    }
+
+    [Test]
+    public async Task CloseWindow_RequestsExactHandleAndReportsClosed()
+    {
+        var platform = new TestComputerRunPlatform();
+        var service = new ComputerRunService(platform);
+
+        var result = JsonDocument.Parse(service.CloseWindow(100, timeoutMilliseconds: 0)).RootElement;
+
+        await Assert.That(result.GetProperty("requested").GetBoolean()).IsTrue();
+        await Assert.That(result.GetProperty("closed").GetBoolean()).IsTrue();
+        await Assert.That(result.GetProperty("reason").GetString()).IsEqualTo("closed");
+        await Assert.That(platform.CloseRequests.Single()).IsEqualTo(100L);
+    }
+
+    [Test]
+    public async Task CloseWindow_UnknownHandleIsIdempotent()
+    {
+        var platform = new TestComputerRunPlatform();
+        var service = new ComputerRunService(platform);
+
+        var result = JsonDocument.Parse(service.CloseWindow(999, timeoutMilliseconds: 0)).RootElement;
+
+        await Assert.That(result.GetProperty("requested").GetBoolean()).IsFalse();
+        await Assert.That(result.GetProperty("closed").GetBoolean()).IsTrue();
+        await Assert.That(result.GetProperty("reason").GetString()).IsEqualTo("not_found");
+        await Assert.That(platform.CloseRequests).IsEmpty();
     }
 
     [Test]

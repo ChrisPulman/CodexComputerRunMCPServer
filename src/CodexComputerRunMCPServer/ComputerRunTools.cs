@@ -107,8 +107,9 @@ public static class ComputerRunTools
     public static string press_key(
         [Description("Key name or single character.")] string key,
         [Description("How long to hold the key, in seconds.")] double duration = 0.03,
-        [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => InvokeControl("press_key", new { keyLength = key?.Length ?? 0, duration, delay }, service => service.PressKey(key ?? string.Empty, duration, delay));
+        [Description("Optional delay after the action, in seconds.")] double? delay = null,
+        [Description("Optional native window handle previously returned by find_windows. When supplied, input is aborted unless that exact window is still foreground.")] long? target_handle = null)
+        => InvokeControl("press_key", new { keyLength = key?.Length ?? 0, duration, delay, target_handle }, service => service.PressKey(key ?? string.Empty, duration, delay, target_handle));
 
     /// <summary>
     /// Presses a keyboard shortcut chord such as <c>ctrl+l</c> or <c>ctrl+shift+escape</c>.
@@ -120,8 +121,9 @@ public static class ComputerRunTools
     [Description("Press a keyboard shortcut, for example ctrl+l or ctrl+shift+escape.")]
     public static string hotkey(
         [Description("Shortcut text. Use +, comma, or space separators, e.g. ctrl+shift+escape.")] string keys,
-        [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => InvokeControl("hotkey", new { keysLength = keys?.Length ?? 0, delay }, service => service.Hotkey(keys ?? string.Empty, delay));
+        [Description("Optional delay after the action, in seconds.")] double? delay = null,
+        [Description("Optional native window handle previously returned by find_windows. When supplied, the shortcut is aborted unless that exact window is still foreground.")] long? target_handle = null)
+        => InvokeControl("hotkey", new { keysLength = keys?.Length ?? 0, delay, target_handle }, service => service.Hotkey(keys ?? string.Empty, delay, target_handle));
 
     /// <summary>
     /// Enters Unicode text into the currently focused application using the platform's preferred text-entry path.
@@ -133,8 +135,9 @@ public static class ComputerRunTools
     [Description("Enter Unicode text into the focused application. Windows uses direct Unicode input without changing the clipboard.")]
     public static string type_text(
         [Description("Text to enter into the focused application.")] string text,
-        [Description("Optional delay after the action, in seconds.")] double? delay = null)
-        => InvokeControl("type_text", new { textLength = text?.Length ?? 0, delay }, service => service.TypeText(text ?? string.Empty, delay));
+        [Description("Optional delay after the action, in seconds.")] double? delay = null,
+        [Description("Optional native window handle previously returned by find_windows. When supplied, text entry is aborted unless that exact window is still foreground.")] long? target_handle = null)
+        => InvokeControl("type_text", new { textLength = text?.Length ?? 0, delay, target_handle }, service => service.TypeText(text ?? string.Empty, delay, target_handle));
 
     /// <summary>
     /// Gets the current cursor position.
@@ -227,6 +230,16 @@ public static class ComputerRunTools
         [Description("Native window handle returned by list_windows.")] long handle,
         [Description("Restore the window before focusing it when minimized.")] bool restore = true)
         => InvokeControl("activate_window", new { handle, restore }, service => service.ActivateWindow(handle, restore));
+
+    /// <summary>
+    /// Requests a graceful close of one exact top-level window.
+    /// </summary>
+    [McpServerTool]
+    [Description("Request a graceful close for one exact window handle. It never terminates the process; if the app shows a save prompt or rejects the request, the result reports closed=false.")]
+    public static string close_window(
+        [Description("Native window handle returned by list_windows or find_windows.")] long handle,
+        [Description("Maximum time to wait for the window to disappear, from 0 to 5000 milliseconds.")] int timeout_ms = 1000)
+        => InvokeControl("close_window", new { handle, timeout_ms }, service => service.CloseWindow(handle, timeout_ms));
 
     private static TResult Invoke<TResult>(string tool, object? arguments, Func<IComputerRunService, TResult> action)
     {
