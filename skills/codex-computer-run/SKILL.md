@@ -25,7 +25,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 
 - Prefer the `mcp__codex_computer_run__` namespace when available.
 - If tools are deferred, search for `ComputerRun`, `codex computer run`, or `desktop screenshot mouse keyboard` and choose the namespace that exposes the complete tool set.
-- Expect these tools: `screenshot`, `list_windows`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`.
+- Expect these tools: `screenshot`, `list_windows`, `activate_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`.
 - If the MCP tools are unavailable, state that the Computer Run server is not configured in the current session instead of simulating desktop interaction with unrelated shell commands.
 
 ## Platform Notes
@@ -38,6 +38,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 
 1. Observe before acting:
    - Use `list_windows` to identify visible applications and likely targets.
+   - Use `activate_window` with a handle returned by `list_windows` when the intended target is not already foreground.
    - Use `screenshot` when visual layout, coordinates, or UI state matters.
    - Use `cursor_position` before relying on the current pointer location.
 2. Plan in absolute desktop coordinates:

@@ -152,6 +152,19 @@ public static class ComputerRunTools
     public static string list_windows([Description("Maximum number of windows to return.")] int limit = 50)
         => Invoke(service => service.ListWindows(limit));
 
+    /// <summary>
+    /// Brings a window returned by <see cref="list_windows"/> to the foreground.
+    /// </summary>
+    /// <param name="handle">Native window handle returned by list_windows.</param>
+    /// <param name="restore">Restore the window first when it is minimized.</param>
+    /// <returns>A human-readable activation result.</returns>
+    [McpServerTool]
+    [Description("Activate a previously enumerated window by native handle. Use a handle from list_windows; optionally restore it when minimized.")]
+    public static string activate_window(
+        [Description("Native window handle returned by list_windows.")] long handle,
+        [Description("Restore the window before focusing it when minimized.")] bool restore = true)
+        => InvokeControl(service => service.ActivateWindow(handle, restore));
+
     private static TResult Invoke<TResult>(Func<IComputerRunService, TResult> action)
     {
         ArgumentNullException.ThrowIfNull(action);

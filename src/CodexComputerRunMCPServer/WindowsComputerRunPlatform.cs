@@ -97,6 +97,26 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
         return new DesktopPoint(point.X, point.Y);
     }
 
+    /// <inheritdoc />
+    public void ActivateWindow(long handle, bool restore)
+    {
+        var window = new IntPtr(handle);
+        if (handle <= 0 || !NativeMethods.IsWindow(window))
+        {
+            throw new ArgumentException($"Window handle {handle} is not a valid open window.", nameof(handle));
+        }
+
+        if (restore && NativeMethods.IsIconic(window))
+        {
+            _ = NativeMethods.ShowWindow(window, NativeMethods.ShowWindowRestore);
+        }
+
+        if (!NativeMethods.SetForegroundWindow(window))
+        {
+            ThrowLastWin32Error("SetForegroundWindow failed");
+        }
+    }
+
     /// <summary>
     /// Performs one or more mouse clicks using the specified button.
     /// </summary>

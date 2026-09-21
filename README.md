@@ -218,6 +218,18 @@ Lists visible top-level desktop windows as JSON.
 
 Each window entry also includes `isForeground`, `isMinimized`, and `bounds` when the platform can provide them. `bounds` contains `left`, `top`, `width`, and `height` in virtual-desktop screen coordinates. Use these fields to confirm the intended process and target window before relying on coordinates; a title match alone is not sufficient when multiple windows are open.
 
+---
+
+### `activate_window`
+
+Brings a previously enumerated window to the foreground by its native handle.
+
+**Parameters:**
+- `handle` - native window handle returned by `list_windows`.
+- `restore` *(default: `true`)* - restore the window first when it is minimized.
+
+**When to use:** Call `list_windows` first, verify the process and title, then activate the exact handle before sending input. Windows uses the native window handle; Linux uses `wmctrl` or `xdotool`; the current macOS adapter reports a clear unsupported error because its window listing does not expose stable native handles.
+
 ## Performance And Integration Notes
 
 - Screenshot capture avoids temporary files when `path` is omitted.
@@ -443,10 +455,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reported all 9 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 10 tools:
 
 ```text
-scroll, hotkey, type_text, screenshot, list_windows, click, move_mouse, press_key, cursor_position
+activate_window, scroll, hotkey, type_text, screenshot, list_windows, click, move_mouse, press_key, cursor_position
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.

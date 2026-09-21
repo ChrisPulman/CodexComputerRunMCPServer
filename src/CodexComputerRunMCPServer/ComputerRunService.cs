@@ -88,6 +88,14 @@ internal interface IComputerRunService
     /// <param name="limit">Maximum number of windows to return. Must be at least 1.</param>
     /// <returns>A JSON payload containing window metadata entries.</returns>
     string ListWindows(int limit);
+
+    /// <summary>
+    /// Brings a previously enumerated top-level window to the foreground.
+    /// </summary>
+    /// <param name="handle">Native window handle returned by <see cref="ListWindows"/>.</param>
+    /// <param name="restore">Whether a minimized window should be restored before focusing it.</param>
+    /// <returns>A human-readable operation result message.</returns>
+    string ActivateWindow(long handle, bool restore);
 }
 
 /// <summary>
@@ -233,6 +241,18 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
 
         var windows = platform.ListWindows(limit);
         return JsonSerializer.Serialize(windows, JsonOptions);
+    }
+
+    /// <inheritdoc />
+    public string ActivateWindow(long handle, bool restore)
+    {
+        if (handle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "handle must be a positive native window handle.");
+        }
+
+        platform.ActivateWindow(handle, restore);
+        return $"Activated window {handle}.";
     }
 
     /// <summary>
@@ -397,6 +417,13 @@ internal interface IComputerRunPlatform
     /// <param name="limit">Maximum number of windows to return.</param>
     /// <returns>Window metadata collection.</returns>
     IReadOnlyList<WindowInfo> ListWindows(int limit);
+
+    /// <summary>
+    /// Brings a native window handle to the foreground.
+    /// </summary>
+    /// <param name="handle">Native window handle returned by the platform.</param>
+    /// <param name="restore">Whether a minimized window should be restored first.</param>
+    void ActivateWindow(long handle, bool restore);
 
     /// <summary>
     /// Resolves a character to a platform-specific key scan code.

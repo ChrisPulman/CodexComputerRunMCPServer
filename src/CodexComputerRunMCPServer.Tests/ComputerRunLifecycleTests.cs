@@ -190,6 +190,8 @@ public class ComputerRunLifecycleTests
         public string TypeText(string text, double? delay) => throw new NotSupportedException();
 
         public string ListWindows(int limit) => throw new NotSupportedException();
+
+        public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
     }
 
     private sealed class ControlLeaseInspectingService : IComputerRunService
@@ -224,5 +226,7 @@ public class ComputerRunLifecycleTests
         public string TypeText(string text, double? delay) => throw new NotSupportedException();
 
         public string ListWindows(int limit) => throw new NotSupportedException();
+
+        public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
     }
 }

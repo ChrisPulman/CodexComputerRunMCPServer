@@ -31,9 +31,9 @@ public class McpIntegrationTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(tools.Length).IsEqualTo(9);
+        await Assert.That(tools.Length).IsEqualTo(10);
         await Assert.That(string.Join("|", tools)).IsEqualTo(
-            "click|cursor_position|hotkey|list_windows|move_mouse|press_key|screenshot|scroll|type_text");
+            "activate_window|click|cursor_position|hotkey|list_windows|move_mouse|press_key|screenshot|scroll|type_text");
     }
 
     [Test]
@@ -66,9 +66,10 @@ public class McpIntegrationTests
         _ = ComputerRunTools.type_text("abc");
         _ = ComputerRunTools.cursor_position();
         _ = ComputerRunTools.list_windows();
+        _ = ComputerRunTools.activate_window(100, restore: false);
         _ = ComputerRunTools.screenshot(include_image: false);
 
-        await Assert.That(service.Calls).IsEqualTo(9);
+        await Assert.That(service.Calls).IsEqualTo(10);
     }
 
     [Test]
@@ -174,6 +175,12 @@ public class McpIntegrationTests
         {
             Calls++;
             return "[]";
+        }
+
+        public string ActivateWindow(long handle, bool restore)
+        {
+            Calls++;
+            return "activate";
         }
     }
 }

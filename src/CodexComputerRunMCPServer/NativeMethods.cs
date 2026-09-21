@@ -95,6 +95,11 @@ internal static partial class NativeMethods
     public const int SystemMetricVirtualScreenHeight = 79;
 
     /// <summary>
+    /// Show-window command that restores a minimized window.
+    /// </summary>
+    public const int ShowWindowRestore = 9;
+
+    /// <summary>
     /// Callback delegate used by <see cref="EnumWindows"/> to enumerate top-level windows.
     /// </summary>
     /// <param name="hWnd">Handle to the current top-level window.</param>
@@ -418,6 +423,34 @@ internal static partial class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    /// <summary>
+    /// Determines whether a native window handle is valid.
+    /// </summary>
+    /// <param name="hWnd">Handle to validate.</param>
+    /// <returns><see langword="true"/> when the handle identifies a window.</returns>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindow(IntPtr hWnd);
+
+    /// <summary>
+    /// Shows or hides a window according to the supplied command.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <param name="nCmdShow">Show-window command.</param>
+    /// <returns><see langword="true"/> when the window was previously visible.</returns>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    /// <summary>
+    /// Brings a window to the foreground.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <returns><see langword="true"/> when the window was brought to the foreground.</returns>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
 
     /// <summary>
     /// Gets the length, in characters, of the specified window's title text.

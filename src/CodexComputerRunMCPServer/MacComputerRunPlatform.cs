@@ -62,6 +62,11 @@ internal sealed class MacComputerRunPlatform(IExternalCommandRunner? commandRunn
     }
 
     /// <inheritdoc />
+    public void ActivateWindow(long handle, bool restore)
+        => throw new PlatformNotSupportedException(
+            "macOS window enumeration does not expose a stable native handle for activation in this adapter.");
+
+    /// <inheritdoc />
     public void Click(MouseButton button, int clicks, TimeSpan interval)
     {
         if (button == MouseButton.Middle)

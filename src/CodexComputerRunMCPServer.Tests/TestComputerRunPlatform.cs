@@ -28,6 +28,8 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public List<(Rectangle Bounds, string Path)> SavedScreenshots { get; } = [];
 
+    public List<(long Handle, bool Restore)> ActivatedWindows { get; } = [];
+
     public List<WindowInfo> Windows { get; } =
     [
         new(100, 200, "notepad", "Untitled - Notepad", true, false, new WindowBounds(10, 20, 640, 480)),
@@ -73,6 +75,8 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
     public void PasteText(string text) => PastedTexts.Add(text);
 
     public IReadOnlyList<WindowInfo> ListWindows(int limit) => Windows.Take(limit).ToArray();
+
+    public void ActivateWindow(long handle, bool restore) => ActivatedWindows.Add((handle, restore));
 
     public short KeyScan(char character) => KeyScans.TryGetValue(character, out var scan) ? scan : (short)-1;
 }

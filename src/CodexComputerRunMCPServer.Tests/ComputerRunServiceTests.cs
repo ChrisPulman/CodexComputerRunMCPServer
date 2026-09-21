@@ -187,6 +187,26 @@ public class ComputerRunServiceTests
     }
 
     [Test]
+    public async Task ActivateWindow_DelegatesHandleAndRestoreFlag()
+    {
+        var platform = new TestComputerRunPlatform();
+        var service = new ComputerRunService(platform);
+
+        var result = service.ActivateWindow(100, restore: false);
+
+        await Assert.That(result).Contains("100");
+        await Assert.That(platform.ActivatedWindows.Single()).IsEqualTo((100L, false));
+    }
+
+    [Test]
+    public async Task ActivateWindow_RejectsInvalidHandle()
+    {
+        var service = new ComputerRunService(new TestComputerRunPlatform());
+
+        await Assert.That(() => service.ActivateWindow(0, restore: true)).Throws<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
     public async Task Service_PropagatesUnsupportedPlatformErrors()
     {
         var service = new ComputerRunService(new UnsupportedComputerRunPlatform("TestOS"));
