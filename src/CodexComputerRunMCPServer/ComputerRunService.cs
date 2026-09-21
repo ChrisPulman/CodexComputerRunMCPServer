@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
@@ -18,7 +19,7 @@ internal interface IComputerRunService
     /// <see langword="true"/> to include the PNG bytes in the tool response; otherwise metadata only.
     /// </param>
     /// <returns>A tool result containing serialized screenshot metadata and optional image content.</returns>
-    CallToolResult Screenshot(string? path, bool includeImage);
+    CallToolResult Screenshot(string? path, bool includeImage, Rectangle? region = null);
 
     /// <summary>
     /// Moves the cursor to the specified desktop coordinates.
@@ -27,7 +28,7 @@ internal interface IComputerRunService
     /// <param name="y">The absolute Y coordinate in virtual desktop space.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message.</returns>
-    string MoveMouse(int x, int y, double? delay);
+    string MoveMouse(int x, int y, double? delay, long? targetHandle);
 
     /// <summary>
     /// Performs one or more mouse clicks using the specified button, optionally moving first.
@@ -39,7 +40,7 @@ internal interface IComputerRunService
     /// <param name="interval">Interval in seconds between clicks. Negative values are clamped to 0.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message including final cursor position.</returns>
-    string Click(int? x, int? y, string button, int clicks, double interval, double? delay);
+    string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle);
 
     /// <summary>
     /// Scrolls the mouse wheel by the specified amount, optionally moving first.
@@ -49,7 +50,7 @@ internal interface IComputerRunService
     /// <param name="y">Optional Y coordinate. Must be provided together with <paramref name="x"/>.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message.</returns>
-    string Scroll(int amount, int? x, int? y, double? delay);
+    string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle);
 
     /// <summary>
     /// Presses and holds a resolved key chord for the requested duration.
@@ -58,7 +59,7 @@ internal interface IComputerRunService
     /// <param name="duration">Hold duration in seconds. Negative values are clamped to 0.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message.</returns>
-    string PressKey(string key, double duration, double? delay);
+    string PressKey(string key, double duration, double? delay, long? targetHandle);
 
     /// <summary>
     /// Presses a hotkey combination.
@@ -66,15 +67,15 @@ internal interface IComputerRunService
     /// <param name="keys">Hotkey expression containing one or more key names.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message.</returns>
-    string Hotkey(string keys, double? delay);
+    string Hotkey(string keys, double? delay, long? targetHandle);
 
     /// <summary>
-    /// Pastes text into the focused application by setting the clipboard and sending Ctrl+V.
+    /// Enters text into the focused application using the platform's preferred text-entry path.
     /// </summary>
-    /// <param name="text">Text to paste. <see langword="null"/> is treated as an empty string.</param>
+    /// <param name="text">Text to enter. <see langword="null"/> is treated as an empty string.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
-    /// <returns>A human-readable operation result message with pasted character count.</returns>
-    string TypeText(string text, double? delay);
+    /// <returns>A human-readable operation result message with entered character count.</returns>
+    string TypeText(string text, double? delay, long? targetHandle);
 
     /// <summary>
     /// Gets the current cursor position.
@@ -88,6 +89,39 @@ internal interface IComputerRunService
     /// <param name="limit">Maximum number of windows to return. Must be at least 1.</param>
     /// <returns>A JSON payload containing window metadata entries.</returns>
     string ListWindows(int limit);
+
+    /// <summary>
+    /// Finds visible windows by optional process, title, foreground, and minimized-state filters.
+    /// </summary>
+    string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit);
+
+    /// <summary>
+    /// Captures the screen-space bounds of a previously enumerated window handle.
+    /// </summary>
+    CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage);
+
+    /// <summary>
+    /// Verifies that a native window still matches the requested targeting predicates.
+    /// </summary>
+    string VerifyWindow(long handle, string? processName, string? titleContains, bool requireForeground, bool allowMinimized);
+
+    /// <summary>
+    /// Waits for a matching window for a bounded period without performing desktop input.
+    /// </summary>
+    string WaitForWindow(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int timeoutMilliseconds, int pollMilliseconds);
+
+    /// <summary>
+    /// Brings a previously enumerated top-level window to the foreground.
+    /// </summary>
+    /// <param name="handle">Native window handle returned by <see cref="ListWindows"/>.</param>
+    /// <param name="restore">Whether a minimized window should be restored before focusing it.</param>
+    /// <returns>A human-readable operation result message.</returns>
+    string ActivateWindow(long handle, bool restore);
+
+    /// <summary>
+    /// Requests a graceful close of one exact top-level window and reports whether it disappeared.
+    /// </summary>
+    string CloseWindow(long handle, int timeoutMilliseconds);
 }
 
 /// <summary>
@@ -105,9 +139,10 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     public static IComputerRunService CreateDefault() => new ComputerRunService(ComputerRunPlatformFactory.CreateDefault());
 
     /// <inheritdoc />
-    public CallToolResult Screenshot(string? path, bool includeImage)
+    public CallToolResult Screenshot(string? path, bool includeImage, Rectangle? region = null)
     {
-        var bounds = platform.GetVirtualScreenBounds();
+        var bounds = region ?? platform.GetVirtualScreenBounds();
+        ValidateScreenshotRegion(bounds);
         var screenshotPath = ResolveOptionalPath(path);
         byte[]? imageBytes = null;
 
@@ -148,15 +183,16 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string MoveMouse(int x, int y, double? delay)
+    public string MoveMouse(int x, int y, double? delay, long? targetHandle)
     {
+        EnsureInputTarget(targetHandle, requireForeground: false);
         platform.MoveCursor(x, y);
         Delay.Sleep(delay);
         return $"Moved cursor to ({x}, {y}).";
     }
 
     /// <inheritdoc />
-    public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
+    public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
     {
         MoveCursorIfCoordinatesProvided(x, y);
 
@@ -167,6 +203,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
 
         var parsedButton = MouseButtonParser.Parse(button);
         var intervalDelay = Delay.FromSeconds(Math.Max(0, interval), nameof(interval));
+        EnsureInputTarget(targetHandle, requireForeground: true);
         platform.Click(parsedButton, clicks, intervalDelay);
 
         Delay.Sleep(delay);
@@ -175,20 +212,22 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string Scroll(int amount, int? x, int? y, double? delay)
+    public string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle)
     {
         MoveCursorIfCoordinatesProvided(x, y);
 
+        EnsureInputTarget(targetHandle, requireForeground: true);
         platform.Scroll(amount);
         Delay.Sleep(delay);
         return $"Scrolled {amount} wheel notch(es).";
     }
 
     /// <inheritdoc />
-    public string PressKey(string key, double duration, double? delay)
+    public string PressKey(string key, double duration, double? delay, long? targetHandle)
     {
         var keyChord = KeyboardInput.ResolveKeyChord(key, platform.KeyScan);
         var holdDuration = Delay.FromSeconds(Math.Max(0, duration), nameof(duration));
+        EnsureInputTarget(targetHandle, requireForeground: true);
         platform.PressKey(keyChord, holdDuration);
 
         Delay.Sleep(delay);
@@ -196,9 +235,10 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string Hotkey(string keys, double? delay)
+    public string Hotkey(string keys, double? delay, long? targetHandle)
     {
         var virtualKeys = KeyboardInput.ResolveHotkey(keys, platform.KeyScan);
+        EnsureInputTarget(targetHandle, requireForeground: true);
         platform.PressHotkey(virtualKeys);
 
         Delay.Sleep(delay);
@@ -206,13 +246,14 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string TypeText(string text, double? delay)
+    public string TypeText(string text, double? delay, long? targetHandle)
     {
-        var pastedText = text ?? string.Empty;
-        platform.PasteText(pastedText);
+        var enteredText = text ?? string.Empty;
+        EnsureInputTarget(targetHandle, requireForeground: true);
+        platform.TypeText(enteredText);
 
         Delay.Sleep(delay);
-        return $"Pasted {pastedText.Length} character(s) into the focused app.";
+        return $"Entered {enteredText.Length} character(s) into the focused app.";
     }
 
     /// <inheritdoc />
@@ -230,8 +271,223 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
             throw new ArgumentOutOfRangeException(nameof(limit), "limit must be at least 1.");
         }
 
-        var windows = platform.ListWindows(limit);
+        var windows = ListWindowsWithSingleRetry(limit);
         return JsonSerializer.Serialize(windows, JsonOptions);
+    }
+
+    /// <inheritdoc />
+    public string FindWindows(
+        string? processName,
+        string? titleContains,
+        bool foregroundOnly,
+        bool includeMinimized,
+        int limit)
+    {
+        ValidateWindowLimit(limit);
+
+        var normalizedProcess = NormalizeFilter(processName);
+        var normalizedTitle = NormalizeFilter(titleContains);
+        var windows = FindMatchingWindowInfos(normalizedProcess, normalizedTitle, foregroundOnly, includeMinimized, limit);
+
+        return JsonSerializer.Serialize(windows, JsonOptions);
+    }
+
+    /// <inheritdoc />
+    public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage)
+    {
+        if (handle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "handle must be a positive native window handle.");
+        }
+
+        var window = ListWindowsWithSingleRetry(WindowEnumerationLimit)
+            .FirstOrDefault(candidate => candidate.Handle == handle);
+
+        if (window is null)
+        {
+            throw new ArgumentException(
+                $"Window handle {handle} was not found among visible top-level windows. Call list_windows or find_windows again.",
+                nameof(handle));
+        }
+
+        if (window.Bounds is null)
+        {
+            throw new PlatformNotSupportedException(
+                $"The current platform did not provide screen bounds for window handle {handle}.");
+        }
+
+        var bounds = new Rectangle(window.Bounds.Left, window.Bounds.Top, window.Bounds.Width, window.Bounds.Height);
+        return Screenshot(path, includeImage, bounds);
+    }
+
+    /// <inheritdoc />
+    public string VerifyWindow(
+        long handle,
+        string? processName,
+        string? titleContains,
+        bool requireForeground,
+        bool allowMinimized)
+    {
+        if (handle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "handle must be a positive native window handle.");
+        }
+
+        var expectedProcess = NormalizeFilter(processName);
+        var expectedTitle = NormalizeFilter(titleContains);
+        var window = ListWindowsWithSingleRetry(WindowEnumerationLimit)
+            .FirstOrDefault(candidate => candidate.Handle == handle);
+
+        if (window is null)
+        {
+            return JsonSerializer.Serialize(new { ok = false, handle, reason = "not_found", window = (WindowInfo?)null }, JsonOptions);
+        }
+
+        var reason = expectedProcess is not null
+            && !string.Equals(window.ProcessName, expectedProcess, StringComparison.OrdinalIgnoreCase)
+            ? "process_mismatch"
+            : expectedTitle is not null
+                && !window.Title.Contains(expectedTitle, StringComparison.OrdinalIgnoreCase)
+                ? "title_mismatch"
+                : requireForeground && window.IsForeground != true
+                    ? "not_foreground"
+                    : !allowMinimized && window.IsMinimized == true
+                        ? "minimized"
+                        : "matched";
+
+        return JsonSerializer.Serialize(new { ok = reason == "matched", handle, reason, window }, JsonOptions);
+    }
+
+    /// <inheritdoc />
+    public string WaitForWindow(
+        string? processName,
+        string? titleContains,
+        bool foregroundOnly,
+        bool includeMinimized,
+        int timeoutMilliseconds,
+        int pollMilliseconds)
+    {
+        if (timeoutMilliseconds is < 0 or > MaxWindowWaitMilliseconds)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeoutMilliseconds), $"timeoutMilliseconds must be between 0 and {MaxWindowWaitMilliseconds}.");
+        }
+
+        if (pollMilliseconds is < MinWindowPollMilliseconds or > MaxWindowPollMilliseconds)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pollMilliseconds), $"pollMilliseconds must be between {MinWindowPollMilliseconds} and {MaxWindowPollMilliseconds}.");
+        }
+
+        var expectedProcess = NormalizeFilter(processName);
+        var expectedTitle = NormalizeFilter(titleContains);
+        var stopwatch = Stopwatch.StartNew();
+
+        while (true)
+        {
+            var match = FindMatchingWindowInfos(expectedProcess, expectedTitle, foregroundOnly, includeMinimized, 1)
+                .FirstOrDefault();
+            if (match is not null)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    found = true,
+                    waitedMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                    window = match,
+                }, JsonOptions);
+            }
+
+            if (stopwatch.ElapsedMilliseconds >= timeoutMilliseconds)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    found = false,
+                    waitedMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                    window = (WindowInfo?)null,
+                }, JsonOptions);
+            }
+
+            var remaining = TimeSpan.FromMilliseconds(timeoutMilliseconds) - stopwatch.Elapsed;
+            Thread.Sleep(remaining < TimeSpan.FromMilliseconds(pollMilliseconds)
+                ? remaining
+                : TimeSpan.FromMilliseconds(pollMilliseconds));
+        }
+    }
+
+    /// <inheritdoc />
+    public string ActivateWindow(long handle, bool restore)
+    {
+        if (handle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "handle must be a positive native window handle.");
+        }
+
+        platform.ActivateWindow(handle, restore);
+        return $"Activated window {handle}.";
+    }
+
+    /// <inheritdoc />
+    public string CloseWindow(long handle, int timeoutMilliseconds)
+    {
+        if (handle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "handle must be a positive native window handle.");
+        }
+
+        if (timeoutMilliseconds is < 0 or > MaxWindowCloseWaitMilliseconds)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(timeoutMilliseconds),
+                $"timeoutMilliseconds must be between 0 and {MaxWindowCloseWaitMilliseconds}.");
+        }
+
+        var window = ListWindowsWithSingleRetry(WindowEnumerationLimit)
+            .FirstOrDefault(candidate => candidate.Handle == handle);
+        if (window is null)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                requested = false,
+                closed = true,
+                handle,
+                reason = "not_found",
+            }, JsonOptions);
+        }
+
+        platform.RequestCloseWindow(handle);
+        var stopwatch = Stopwatch.StartNew();
+        while (true)
+        {
+            var stillPresent = ListWindowsWithSingleRetry(WindowEnumerationLimit)
+                .Any(candidate => candidate.Handle == handle);
+            if (!stillPresent)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    requested = true,
+                    closed = true,
+                    handle,
+                    waitedMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                    reason = "closed",
+                }, JsonOptions);
+            }
+
+            if (stopwatch.ElapsedMilliseconds >= timeoutMilliseconds)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    requested = true,
+                    closed = false,
+                    handle,
+                    waitedMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 3),
+                    reason = "still_present",
+                    note = "The window may be waiting for a save decision or may have rejected the graceful close request.",
+                }, JsonOptions);
+            }
+
+            var remaining = TimeSpan.FromMilliseconds(timeoutMilliseconds) - stopwatch.Elapsed;
+            Thread.Sleep(remaining < TimeSpan.FromMilliseconds(MinWindowPollMilliseconds)
+                ? remaining
+                : TimeSpan.FromMilliseconds(MinWindowPollMilliseconds));
+        }
     }
 
     /// <summary>
@@ -258,6 +514,105 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
 
         return fullPath;
     }
+
+    /// <summary>
+    /// Validates a requested screenshot region before passing it to a platform adapter.
+    /// </summary>
+    /// <param name="region">The region to validate.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the region has no area.</exception>
+    private static void ValidateScreenshotRegion(Rectangle region)
+    {
+        if (region.Width <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(region), "Screenshot width must be greater than zero.");
+        }
+
+        if (region.Height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(region), "Screenshot height must be greater than zero.");
+        }
+    }
+
+    private static void ValidateWindowLimit(int limit)
+    {
+        if (limit < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit), "limit must be at least 1.");
+        }
+    }
+
+    private static string? NormalizeFilter(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// Verifies an optional native window handle immediately before desktop input.
+    /// A failed check aborts without sending any input, preventing a stale focus from
+    /// routing a destructive shortcut to another application.
+    /// </summary>
+    private void EnsureInputTarget(long? targetHandle, bool requireForeground)
+    {
+        if (targetHandle is null)
+        {
+            return;
+        }
+
+        if (targetHandle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(targetHandle), "targetHandle must be a positive native window handle.");
+        }
+
+        var target = ListWindowsWithSingleRetry(WindowEnumerationLimit)
+            .FirstOrDefault(candidate => candidate.Handle == targetHandle.Value);
+        if (target is null)
+        {
+            throw new InvalidOperationException($"Target window {targetHandle.Value} was not found. No keyboard input was sent.");
+        }
+
+        if (target.IsMinimized == true || requireForeground && target.IsForeground != true)
+        {
+            throw new InvalidOperationException(
+                $"Target window {targetHandle.Value} is not a valid input target (it must be visible" +
+                (requireForeground ? " and foreground" : string.Empty) +
+                "). No desktop input was sent; activate it and retry with targetHandle.");
+        }
+    }
+
+    private IReadOnlyList<WindowInfo> FindMatchingWindowInfos(
+        string? processName,
+        string? titleContains,
+        bool foregroundOnly,
+        bool includeMinimized,
+        int limit)
+        => ListWindowsWithSingleRetry(WindowEnumerationLimit)
+            .Where(window => processName is null
+                || string.Equals(window.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
+            .Where(window => titleContains is null
+                || window.Title.Contains(titleContains, StringComparison.OrdinalIgnoreCase))
+            .Where(window => !foregroundOnly || window.IsForeground == true)
+            .Where(window => includeMinimized || window.IsMinimized != true)
+            .Take(limit)
+            .ToArray();
+
+    /// <summary>
+    /// Retries only the idempotent window enumeration once. Input-changing operations never use this path.
+    /// </summary>
+    private IReadOnlyList<WindowInfo> ListWindowsWithSingleRetry(int limit)
+    {
+        try
+        {
+            return platform.ListWindows(limit);
+        }
+        catch
+        {
+            return platform.ListWindows(limit);
+        }
+    }
+
+    private const int WindowEnumerationLimit = 256;
+    private const int MaxWindowWaitMilliseconds = 30_000;
+    private const int MaxWindowCloseWaitMilliseconds = 5_000;
+    private const int MinWindowPollMilliseconds = 25;
+    private const int MaxWindowPollMilliseconds = 1_000;
 
     /// <summary>
     /// Creates a user-facing status message for screenshot operations.
@@ -367,10 +722,10 @@ internal interface IComputerRunPlatform
     void PressHotkey(IReadOnlyList<byte> virtualKeys);
 
     /// <summary>
-    /// Pastes text into the focused application using the platform's preferred text-entry path.
+    /// Enters text into the focused application using the platform's preferred text-entry path.
     /// </summary>
-    /// <param name="text">Text to paste.</param>
-    void PasteText(string text);
+    /// <param name="text">Text to enter.</param>
+    void TypeText(string text);
 
     /// <summary>
     /// Enumerates top-level windows up to the requested limit.
@@ -378,6 +733,18 @@ internal interface IComputerRunPlatform
     /// <param name="limit">Maximum number of windows to return.</param>
     /// <returns>Window metadata collection.</returns>
     IReadOnlyList<WindowInfo> ListWindows(int limit);
+
+    /// <summary>
+    /// Brings a native window handle to the foreground.
+    /// </summary>
+    /// <param name="handle">Native window handle returned by the platform.</param>
+    /// <param name="restore">Whether a minimized window should be restored first.</param>
+    void ActivateWindow(long handle, bool restore);
+
+    /// <summary>
+    /// Requests a graceful close for one exact native window handle.
+    /// </summary>
+    void RequestCloseWindow(long handle);
 
     /// <summary>
     /// Resolves a character to a platform-specific key scan code.
@@ -421,4 +788,23 @@ internal sealed record ScreenshotMetadata(
 /// <param name="ProcessId">Owning process identifier.</param>
 /// <param name="ProcessName">Owning process name, when available.</param>
 /// <param name="Title">Window title text.</param>
-internal sealed record WindowInfo(long Handle, int ProcessId, string? ProcessName, string Title);
+/// <param name="IsForeground">Whether the window is the current foreground window, when the platform reports it.</param>
+/// <param name="IsMinimized">Whether the window is minimized, when the platform reports it.</param>
+/// <param name="Bounds">Window bounds in virtual desktop screen coordinates, when available.</param>
+internal sealed record WindowInfo(
+    long Handle,
+    int ProcessId,
+    string? ProcessName,
+    string Title,
+    bool? IsForeground = null,
+    bool? IsMinimized = null,
+    WindowBounds? Bounds = null);
+
+/// <summary>
+/// Describes a top-level window's screen-space bounds.
+/// </summary>
+/// <param name="Left">Left edge in virtual desktop coordinates.</param>
+/// <param name="Top">Top edge in virtual desktop coordinates.</param>
+/// <param name="Width">Window width in pixels.</param>
+/// <param name="Height">Window height in pixels.</param>
+internal sealed record WindowBounds(int Left, int Top, int Width, int Height);

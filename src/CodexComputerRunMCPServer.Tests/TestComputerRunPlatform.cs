@@ -28,10 +28,16 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public List<(Rectangle Bounds, string Path)> SavedScreenshots { get; } = [];
 
+    public List<(long Handle, bool Restore)> ActivatedWindows { get; } = [];
+
+    public List<long> CloseRequests { get; } = [];
+
+    public int ListWindowsFailuresRemaining { get; set; }
+
     public List<WindowInfo> Windows { get; } =
     [
-        new(100, 200, "notepad", "Untitled - Notepad"),
-        new(101, 201, "explorer", "Downloads"),
+        new(100, 200, "notepad", "Untitled - Notepad", true, false, new WindowBounds(10, 20, 640, 480)),
+        new(101, 201, "explorer", "Downloads", false, true, new WindowBounds(0, 0, 1024, 768)),
     ];
 
     public Dictionary<char, short> KeyScans { get; } = new()
@@ -70,9 +76,26 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public void PressHotkey(IReadOnlyList<byte> virtualKeys) => Hotkeys.Add(virtualKeys.ToArray());
 
-    public void PasteText(string text) => PastedTexts.Add(text);
+    public void TypeText(string text) => PastedTexts.Add(text);
 
-    public IReadOnlyList<WindowInfo> ListWindows(int limit) => Windows.Take(limit).ToArray();
+    public IReadOnlyList<WindowInfo> ListWindows(int limit)
+    {
+        if (ListWindowsFailuresRemaining > 0)
+        {
+            ListWindowsFailuresRemaining--;
+            throw new InvalidOperationException("temporary window enumeration failure");
+        }
+
+        return Windows.Take(limit).ToArray();
+    }
+
+    public void ActivateWindow(long handle, bool restore) => ActivatedWindows.Add((handle, restore));
+
+    public void RequestCloseWindow(long handle)
+    {
+        CloseRequests.Add(handle);
+        Windows.RemoveAll(window => window.Handle == handle);
+    }
 
     public short KeyScan(char character) => KeyScans.TryGetValue(character, out var scan) ? scan : (short)-1;
 }

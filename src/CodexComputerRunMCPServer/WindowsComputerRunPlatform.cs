@@ -10,7 +10,7 @@ namespace CodexComputerRunMCPServer;
 
 /// <summary>
 /// Windows-specific implementation of <see cref="IComputerRunPlatform"/> that provides
-/// desktop automation primitives such as screen capture, mouse/keyboard input, clipboard updates,
+/// desktop automation primitives such as screen capture and mouse/keyboard input,
 /// and top-level window enumeration through Win32 interop.
 /// </summary>
 [ExcludeFromCodeCoverage]
@@ -95,6 +95,67 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
         }
 
         return new DesktopPoint(point.X, point.Y);
+    }
+
+    /// <inheritdoc />
+    public void ActivateWindow(long handle, bool restore)
+    {
+        var window = new IntPtr(handle);
+        if (handle <= 0 || !NativeMethods.IsWindow(window))
+        {
+            throw new ArgumentException($"Window handle {handle} is not a valid open window.", nameof(handle));
+        }
+
+        if (restore && NativeMethods.IsIconic(window))
+        {
+            _ = NativeMethods.ShowWindow(window, NativeMethods.ShowWindowRestore);
+        }
+
+        var currentThread = NativeMethods.GetCurrentThreadId();
+        var targetThread = NativeMethods.GetWindowThreadProcessId(window, out _);
+        var attached = targetThread != 0
+            && targetThread != currentThread
+            && NativeMethods.AttachThreadInput(currentThread, targetThread, attach: true);
+
+        try
+        {
+            _ = NativeMethods.BringWindowToTop(window);
+            _ = NativeMethods.SetActiveWindow(window);
+            if (!NativeMethods.SetForegroundWindow(window))
+            {
+                ThrowLastWin32Error("SetForegroundWindow failed");
+            }
+
+            if (!WaitForForeground(window, TimeSpan.FromMilliseconds(1500)))
+            {
+                var actual = NativeMethods.GetForegroundWindow();
+                throw new InvalidOperationException(
+                    $"Windows accepted activation for {handle}, but it did not become foreground. " +
+                    $"The current foreground handle is {actual.ToInt64()}. No follow-up input should be sent.");
+            }
+        }
+        finally
+        {
+            if (attached)
+            {
+                _ = NativeMethods.AttachThreadInput(currentThread, targetThread, attach: false);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public void RequestCloseWindow(long handle)
+    {
+        var window = new IntPtr(handle);
+        if (handle <= 0 || !NativeMethods.IsWindow(window))
+        {
+            throw new ArgumentException($"Window handle {handle} is not a valid open window.", nameof(handle));
+        }
+
+        if (!NativeMethods.PostMessage(window, NativeMethods.WindowMessageClose, IntPtr.Zero, IntPtr.Zero))
+        {
+            ThrowLastWin32Error("WM_CLOSE request failed");
+        }
     }
 
     /// <summary>
@@ -195,76 +256,17 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
     }
 
     /// <summary>
-    /// Pastes text into the focused application using the clipboard and Ctrl+V.
+    /// Enters text into the focused application with Unicode keyboard events.
     /// </summary>
-    /// <param name="text">The text to paste.</param>
-    public void PasteText(string text)
+    /// <param name="text">The text to enter.</param>
+    public void TypeText(string text)
     {
-        SetClipboardText(text);
-        PressHotkey([KeyboardInput.ControlKey, KeyboardInput.VKey]);
-    }
-
-    /// <summary>
-    /// Replaces clipboard text with the supplied Unicode string.
-    /// </summary>
-    /// <param name="text">The text to place on the clipboard.</param>
-    /// <exception cref="Win32Exception">
-    /// Thrown when clipboard access, memory allocation, or clipboard update operations fail.
-    /// </exception>
-    private void SetClipboardText(string text)
-    {
-        var data = Encoding.Unicode.GetBytes(text + '\0');
-        if (!TryOpenClipboard())
+        if (string.IsNullOrEmpty(text))
         {
-            ThrowLastWin32Error("OpenClipboard failed");
+            return;
         }
 
-        IntPtr handle = IntPtr.Zero;
-        var clipboardOwnsHandle = false;
-
-        try
-        {
-            if (!NativeMethods.EmptyClipboard())
-            {
-                ThrowLastWin32Error("EmptyClipboard failed");
-            }
-
-            handle = NativeMethods.GlobalAlloc(NativeMethods.GmemMoveable, (UIntPtr)data.Length);
-            if (handle == IntPtr.Zero)
-            {
-                ThrowLastWin32Error("GlobalAlloc failed");
-            }
-
-            var locked = NativeMethods.GlobalLock(handle);
-            if (locked == IntPtr.Zero)
-            {
-                ThrowLastWin32Error("GlobalLock failed");
-            }
-
-            try
-            {
-                Marshal.Copy(data, 0, locked, data.Length);
-            }
-            finally
-            {
-                _ = NativeMethods.GlobalUnlock(handle);
-            }
-
-            if (NativeMethods.SetClipboardData(NativeMethods.CfUnicodeText, handle) == IntPtr.Zero)
-            {
-                ThrowLastWin32Error("SetClipboardData failed");
-            }
-
-            clipboardOwnsHandle = true;
-        }
-        finally
-        {
-            _ = NativeMethods.CloseClipboard();
-            if (handle != IntPtr.Zero && !clipboardOwnsHandle)
-            {
-                _ = NativeMethods.GlobalFree(handle);
-            }
-        }
+        SendInputs(CreateUnicodeTextInputs(text));
     }
 
     /// <summary>
@@ -276,6 +278,7 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
     {
         var windows = new List<WindowInfo>(Math.Min(limit, 128));
         var processNames = new Dictionary<int, string?>();
+        var foregroundWindow = NativeMethods.GetForegroundWindow();
 
         NativeMethods.EnumWindows((hWnd, lParam) =>
         {
@@ -311,7 +314,22 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
                 processNames[pid] = processName;
             }
 
-            windows.Add(new WindowInfo(hWnd.ToInt64(), pid, processName, title));
+            var bounds = NativeMethods.GetWindowRect(hWnd, out var rect)
+                ? new WindowBounds(
+                    rect.Left,
+                    rect.Top,
+                    Math.Max(0, rect.Right - rect.Left),
+                    Math.Max(0, rect.Bottom - rect.Top))
+                : null;
+
+            windows.Add(new WindowInfo(
+                hWnd.ToInt64(),
+                pid,
+                processName,
+                title,
+                IsForeground: hWnd == foregroundWindow,
+                IsMinimized: NativeMethods.IsIconic(hWnd),
+                Bounds: bounds));
             return true;
         }, IntPtr.Zero);
 
@@ -437,6 +455,42 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
         };
 
     /// <summary>
+    /// Creates paired Unicode key-down/key-up events without touching the clipboard.
+    /// Win32 consumes UTF-16 code units here, which preserves surrogate pairs.
+    /// </summary>
+    /// <param name="text">Text to inject into the focused application.</param>
+    /// <returns>One down/up pair for each UTF-16 code unit.</returns>
+    private static NativeMethods.Input[] CreateUnicodeTextInputs(string text)
+    {
+        var inputs = new NativeMethods.Input[text.Length * 2];
+        for (var index = 0; index < text.Length; index++)
+        {
+            var offset = index * 2;
+            inputs[offset] = CreateUnicodeKeyboardInput(text[index], keyUp: false);
+            inputs[offset + 1] = CreateUnicodeKeyboardInput(text[index], keyUp: true);
+        }
+
+        return inputs;
+    }
+
+    /// <summary>
+    /// Creates one Unicode keyboard input event.
+    /// </summary>
+    private static NativeMethods.Input CreateUnicodeKeyboardInput(char codeUnit, bool keyUp)
+        => new()
+        {
+            Type = NativeMethods.InputKeyboard,
+            Anonymous = new NativeMethods.InputUnion
+            {
+                KeyboardInput = new NativeMethods.KeyboardInput
+                {
+                    Scan = codeUnit,
+                    Flags = NativeMethods.KeyEventUnicode | (keyUp ? NativeMethods.KeyEventKeyUp : 0),
+                },
+            },
+        };
+
+    /// <summary>
     /// Sends the provided input events through the Win32 <c>SendInput</c> API.
     /// </summary>
     /// <param name="inputs">Input events to inject.</param>
@@ -452,23 +506,20 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
         }
     }
 
-    /// <summary>
-    /// Attempts to open the clipboard with short retries to handle temporary lock contention.
-    /// </summary>
-    /// <returns><see langword="true"/> if the clipboard was opened; otherwise <see langword="false"/>.</returns>
-    private static bool TryOpenClipboard()
+    private static bool WaitForForeground(IntPtr window, TimeSpan timeout)
     {
-        for (var attempt = 0; attempt < 10; attempt++)
+        var stopwatch = Stopwatch.StartNew();
+        while (NativeMethods.GetForegroundWindow() != window)
         {
-            if (NativeMethods.OpenClipboard(IntPtr.Zero))
+            if (stopwatch.Elapsed >= timeout)
             {
-                return true;
+                return false;
             }
 
-            Thread.Sleep(TimeSpan.FromMilliseconds(8));
+            Thread.Sleep(15);
         }
 
-        return false;
+        return true;
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ namespace CodexComputerRunMCPServer;
 
 /// <summary>
 /// Provides Win32 interop constants, structures, delegates, and native function imports
-/// used for input simulation, clipboard operations, DPI awareness, and window enumeration.
+/// used for input simulation, DPI awareness, and window enumeration.
 /// </summary>
 /// <remarks>
 /// This type is marked as excluded from code coverage because it contains platform invoke declarations.
@@ -65,14 +65,9 @@ internal static partial class NativeMethods
     public const uint KeyEventKeyUp = 0x0002;
 
     /// <summary>
-    /// Clipboard format identifier for Unicode text (<c>CF_UNICODETEXT</c>).
+    /// Keyboard Unicode scan-code event flag.
     /// </summary>
-    public const uint CfUnicodeText = 13;
-
-    /// <summary>
-    /// Movable global memory allocation flag (<c>GMEM_MOVEABLE</c>).
-    /// </summary>
-    public const uint GmemMoveable = 0x0002;
+    public const uint KeyEventUnicode = 0x0004;
 
     /// <summary>
     /// X coordinate of the virtual screen.
@@ -93,6 +88,14 @@ internal static partial class NativeMethods
     /// Height of the virtual screen.
     /// </summary>
     public const int SystemMetricVirtualScreenHeight = 79;
+
+    /// <summary>
+    /// Show-window command that restores a minimized window.
+    /// </summary>
+    public const int ShowWindowRestore = 9;
+
+    /// <summary>Window message requesting a graceful close.</summary>
+    public const uint WindowMessageClose = 0x0010;
 
     /// <summary>
     /// Callback delegate used by <see cref="EnumWindows"/> to enumerate top-level windows.
@@ -119,6 +122,33 @@ internal static partial class NativeMethods
         /// Vertical coordinate.
         /// </summary>
         public int Y;
+    }
+
+    /// <summary>
+    /// Represents the screen-space rectangle returned by Win32 for a top-level window.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect
+    {
+        /// <summary>
+        /// Left edge in virtual desktop coordinates.
+        /// </summary>
+        public int Left;
+
+        /// <summary>
+        /// Top edge in virtual desktop coordinates.
+        /// </summary>
+        public int Top;
+
+        /// <summary>
+        /// Right edge in virtual desktop coordinates.
+        /// </summary>
+        public int Right;
+
+        /// <summary>
+        /// Bottom edge in virtual desktop coordinates.
+        /// </summary>
+        public int Bottom;
     }
 
     /// <summary>
@@ -300,80 +330,6 @@ internal static partial class NativeMethods
     public static extern short VkKeyScan(char ch);
 
     /// <summary>
-    /// Opens the clipboard for examination and modification.
-    /// </summary>
-    /// <param name="hWndNewOwner">Handle of the window opening the clipboard, or <see cref="IntPtr.Zero"/>.</param>
-    /// <returns><see langword="true"/> if successful; otherwise, <see langword="false"/>.</returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool OpenClipboard(IntPtr hWndNewOwner);
-
-    /// <summary>
-    /// Empties the clipboard and frees handles to data in the clipboard.
-    /// </summary>
-    /// <returns><see langword="true"/> if successful; otherwise, <see langword="false"/>.</returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool EmptyClipboard();
-
-    /// <summary>
-    /// Places data on the clipboard in the specified format.
-    /// </summary>
-    /// <param name="format">Clipboard format identifier.</param>
-    /// <param name="handle">Handle to data in global memory.</param>
-    /// <returns>
-    /// Handle to the data if successful; otherwise, <see cref="IntPtr.Zero"/>.
-    /// </returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    public static extern IntPtr SetClipboardData(uint format, IntPtr handle);
-
-    /// <summary>
-    /// Closes the clipboard.
-    /// </summary>
-    /// <returns><see langword="true"/> if successful; otherwise, <see langword="false"/>.</returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool CloseClipboard();
-
-    /// <summary>
-    /// Allocates memory from the process default heap.
-    /// </summary>
-    /// <param name="flags">Allocation flags (for example, <see cref="GmemMoveable"/>).</param>
-    /// <param name="bytes">Number of bytes to allocate.</param>
-    /// <returns>
-    /// Handle to the allocated memory block, or <see cref="IntPtr.Zero"/> on failure.
-    /// </returns>
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr GlobalAlloc(uint flags, UIntPtr bytes);
-
-    /// <summary>
-    /// Locks a global memory object and returns a pointer to the first byte.
-    /// </summary>
-    /// <param name="handle">Handle to the global memory object.</param>
-    /// <returns>Pointer to the memory block, or <see cref="IntPtr.Zero"/> on failure.</returns>
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr GlobalLock(IntPtr handle);
-
-    /// <summary>
-    /// Decrements the lock count associated with a global memory object.
-    /// </summary>
-    /// <param name="handle">Handle to the global memory object.</param>
-    /// <returns><see langword="true"/> if successful; otherwise, <see langword="false"/>.</returns>
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool GlobalUnlock(IntPtr handle);
-
-    /// <summary>
-    /// Frees the specified global memory object.
-    /// </summary>
-    /// <param name="handle">Handle to the global memory object.</param>
-    /// <returns>
-    /// <see cref="IntPtr.Zero"/> if successful; otherwise, the original handle.
-    /// </returns>
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr GlobalFree(IntPtr handle);
-
-    /// <summary>
     /// Enumerates all top-level windows on the screen.
     /// </summary>
     /// <param name="lpEnumFunc">Callback invoked for each window handle.</param>
@@ -391,6 +347,59 @@ internal static partial class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    /// <summary>
+    /// Determines whether a native window handle is valid.
+    /// </summary>
+    /// <param name="hWnd">Handle to validate.</param>
+    /// <returns><see langword="true"/> when the handle identifies a window.</returns>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindow(IntPtr hWnd);
+
+    /// <summary>
+    /// Shows or hides a window according to the supplied command.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <param name="nCmdShow">Show-window command.</param>
+    /// <returns><see langword="true"/> when the window was previously visible.</returns>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    /// <summary>
+    /// Brings a window to the foreground.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <returns><see langword="true"/> when the window was brought to the foreground.</returns>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    /// <summary>
+    /// Brings a window to the top of the Z order without changing its size or position.
+    /// </summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool BringWindowToTop(IntPtr hWnd);
+
+    /// <summary>Sets the active window for the calling thread.</summary>
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetActiveWindow(IntPtr hWnd);
+
+    /// <summary>Returns the identifier of the calling thread.</summary>
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+
+    /// <summary>Temporarily shares input state between two GUI threads.</summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool attach);
+
+    /// <summary>Posts a message to a window without changing the foreground window.</summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PostMessage(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
 
     /// <summary>
     /// Gets the length, in characters, of the specified window's title text.
@@ -418,4 +427,30 @@ internal static partial class NativeMethods
     /// <returns>The identifier of the thread that created the window.</returns>
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    /// <summary>
+    /// Retrieves the handle of the foreground window.
+    /// </summary>
+    /// <returns>The handle of the window receiving user input, or zero when unavailable.</returns>
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    /// <summary>
+    /// Determines whether a window is minimized.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <returns><see langword="true"/> when the window is minimized.</returns>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsIconic(IntPtr hWnd);
+
+    /// <summary>
+    /// Retrieves the screen-space bounding rectangle of a window.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <param name="rect">Receives the window rectangle.</param>
+    /// <returns><see langword="true"/> when the rectangle was retrieved.</returns>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
 }

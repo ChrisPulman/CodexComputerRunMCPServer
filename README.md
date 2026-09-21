@@ -3,10 +3,10 @@
 <!-- mcp-name: io.github.chrispulman/codex-computer-run-mcp-server -->
 
 Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct control over a signed-in desktop session.
-It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode paste, cursor position, and visible window discovery, plus a bundled Codex Skill for safe desktop-use workflows.
+It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode text entry, metadata-based window targeting, bounded filesystem organization, and local Git workflows, plus a bundled Codex Skill for safe desktop-use workflows.
 
-It is implemented in C# on `net10.0` using `ModelContextProtocol` `1.3.0`.
-The current package and MCP manifest version is `1.1.0`.
+It is implemented in C# on `net10.0` using `ModelContextProtocol` `2.2.0`.
+The current package and MCP manifest version is `1.2.0`.
 The package targets plain `net10.0` so it can be distributed as a .NET tool. Windows uses native Win32 APIs; Linux and macOS use best-effort command-backed adapters.
 
 ## Quick Install
@@ -21,7 +21,7 @@ Note:
 - These install links are prepared for the intended NuGet package identity `CP.CodexComputerRun.Mcp.Server`.
 - If the latest package has not been published yet, use the manual source-build or published-executable configuration below.
 - Run the server from the signed-in desktop session you want to control. Windows desktop automation must be launched from Windows, not WSL.
-- Linux support expects `xdotool` for pointer and keyboard actions, `xrandr` as a display-geometry fallback, `wmctrl` or `xdotool` for window discovery, one of `gnome-screenshot`, `grim`, or ImageMagick `import` for screenshots, and one of `wl-copy`, `xclip`, or `xsel` for clipboard paste.
+- Linux support expects `xdotool` for pointer and keyboard actions, `xrandr` as a display-geometry fallback, `wmctrl` or `xdotool` for window discovery, one of `gnome-screenshot`, `grim`, or ImageMagick `import` for screenshots, and one of `wl-copy`, `xclip`, `xsel`, or `xdotool` for text entry.
 - macOS support uses `screencapture`, `pbcopy`, and `osascript`; pointer actions require `cliclick`. Screen Recording and Accessibility permissions may be required by macOS.
 
 ## What Codex Computer Run Helps With
@@ -33,7 +33,7 @@ Codex Computer Run gives an agent a minimal, fast desktop-control layer for:
 - **Click** left, right, or middle mouse buttons where supported, including repeated clicks. The built-in macOS adapter supports left and right clicks.
 - **Scroll** the wheel at the current cursor position or supplied coordinates.
 - **Press** single keys and keyboard shortcuts such as `ctrl+l` or `ctrl+shift+escape`.
-- **Paste** Unicode text through the platform clipboard paste path.
+- **Enter** Unicode text through the platform's preferred text-entry path.
 - **Inspect** cursor position and visible top-level windows.
 
 The server is designed for Codex computer-use workflows where the MCP client controls the active desktop.
@@ -44,10 +44,10 @@ Windows remains the primary implementation. Linux and macOS support keeps the sa
 
 | Area | Current behavior |
 |------|------------------|
-| Version | `1.1.0` |
+| Version | `1.2.0` |
 | Target framework | `net10.0` |
-| Windows | Native Win32 implementation with virtual-screen capture, `SendInput`, clipboard paste, cursor position, and visible top-level window enumeration |
-| Linux | Command-backed adapter using `xdotool` for pointer and keyboard input, `xrandr` for display-geometry fallback, `wmctrl` or `xdotool` for windows, screenshot command fallbacks, and clipboard command fallbacks |
+| Windows | Native Win32 implementation with virtual-screen capture, direct Unicode `SendInput`, cursor position, and visible top-level window enumeration |
+| Linux | Command-backed adapter using `xdotool` for pointer and keyboard input, `xrandr` for display-geometry fallback, `wmctrl` or `xdotool` for windows, screenshot command fallbacks, and text-entry command fallbacks |
 | macOS | Command-backed adapter using `screencapture`, `pbcopy`, `osascript`, and `cliclick`; macOS middle-click automation is not supported by the built-in adapter |
 | Unsupported OS | Deterministic unsupported-platform errors instead of silent no-ops |
 | Session requirement | Signed-in interactive desktop session |
@@ -63,7 +63,7 @@ When this server is active, agents should follow this operating protocol:
 2. Use `cursor_position` before relative manual reasoning about the current pointer location.
 3. Use `list_windows` to identify visible applications before focusing or interacting with them.
 4. Use `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text` only when the intended foreground application is known.
-5. Prefer `type_text` for text entry because it uses Unicode clipboard paste and is faster and more reliable than simulated per-character typing.
+5. Prefer `type_text` for text entry because Windows uses direct Unicode input without changing the clipboard; Linux/macOS use their available native text-entry fallback.
 6. Keep screenshots small in conversation by setting `include_image` to `false` when only dimensions, platform metadata, or a saved path are needed.
 
 ## Codex Skill
@@ -109,8 +109,11 @@ Captures the current desktop as PNG.
 **Parameters:**
 - `path` *(optional)* - output PNG path. If omitted, the image is returned in memory and no temporary file is created.
 - `include_image` *(default: `true`)* - include PNG image data in the MCP tool result.
+- `left`, `top`, `width`, `height` *(optional)* - capture only a screen-space region. Provide all four values together; `width` and `height` must be greater than zero.
 
 **Response:** The first content block is JSON metadata with `message`, `path`, `mimeType`, `platform`, `left`, `top`, `width`, and `height`. When `include_image` is `true`, a PNG image block is also returned.
+
+When a region is supplied, the metadata bounds describe that region instead of the full virtual desktop. Region coordinates use the same virtual-desktop screen space as window bounds returned by `list_windows`.
 
 **When to use:** Use before interacting with the desktop, after UI changes, or when the agent needs visual confirmation.
 
@@ -186,10 +189,10 @@ Presses a keyboard shortcut.
 
 ### `type_text`
 
-Pastes Unicode text into the focused application using the platform clipboard paste path.
+Enters Unicode text into the focused application. On Windows it emits Unicode keyboard events directly and does not modify the clipboard; other platforms use their available native fallback.
 
 **Parameters:**
-- `text` - text to paste.
+- `text` - text to enter.
 - `delay` *(optional)* - seconds to wait after the action.
 
 **When to use:** Use for text fields, editors, terminals, and any non-trivial text entry.
@@ -213,17 +216,134 @@ Lists visible top-level desktop windows as JSON.
 
 **When to use:** Use to identify visible applications and window titles before interacting with the desktop.
 
+Each window entry also includes `isForeground`, `isMinimized`, and `bounds` when the platform can provide them. `bounds` contains `left`, `top`, `width`, and `height` in virtual-desktop screen coordinates. Use these fields to confirm the intended process and target window before relying on coordinates; a title match alone is not sufficient when multiple windows are open.
+
+---
+
+### `find_windows`
+
+Finds visible top-level windows by optional process name, title substring, foreground state, and minimized state. Matching is case-insensitive for process names and title text.
+
+**Parameters:**
+- `process_name` *(optional)* - process name such as `Notepad` or `msedge`.
+- `title_contains` *(optional)* - case-insensitive substring of the window title.
+- `foreground_only` *(optional)* - return only windows reported as foreground.
+- `include_minimized` *(optional)* - include minimized windows; defaults to `true`.
+- `limit` *(optional)* - maximum number of matches; defaults to 50.
+
+**When to use:** Prefer this when several windows are open and a process/title predicate is more reliable than choosing by screen coordinates. Re-check the returned handle immediately before a data-bearing action because window handles can become stale.
+
+---
+
+### `screenshot_window`
+
+Captures the screen-space bounds of a visible window selected by native handle. It uses the bounds returned by `list_windows` or `find_windows`; it does not reveal pixels hidden behind another window.
+
+**Parameters:**
+- `handle` - native window handle returned by `list_windows` or `find_windows`.
+- `path` *(optional)* - output PNG path.
+- `include_image` *(optional)* - include PNG bytes in the MCP result; defaults to `true`.
+
+**When to use:** Use after targeting a window when the agent needs a focused visual observation or wants to avoid capturing the entire multi-monitor desktop.
+
+---
+
+### `verify_window`
+
+Checks whether a native window handle still identifies the expected process, title, foreground state, and minimized state. It is observation-only and returns JSON with `ok`, `reason`, and current metadata.
+
+**Parameters:**
+- `handle` - native window handle returned by `list_windows` or `find_windows`.
+- `process_name` *(optional)* - expected process name.
+- `title_contains` *(optional)* - expected title substring.
+- `require_foreground` *(optional)* - require current foreground focus.
+- `allow_minimized` *(optional)* - allow a minimized match; defaults to `true`.
+
+**When to use:** Call immediately before an input-changing action when a handle may have become stale, and after a meaningful transition when you need a machine-readable postcondition.
+
+---
+
+### `wait_for_window`
+
+Waits for a visible window matching optional process, title, foreground, and minimized-state filters. It never sends input and is bounded to 30 seconds; a single failed window enumeration is retried because the query is idempotent.
+
+**Parameters:**
+- `process_name`, `title_contains`, `foreground_only`, `include_minimized` - same targeting filters as `find_windows`.
+- `timeout_ms` *(optional)* - maximum wait from 0 to 30000 milliseconds; defaults to 5000.
+- `poll_ms` *(optional)* - polling interval from 25 to 1000 milliseconds; defaults to 100.
+
+**When to use:** Use after launching an identified application or waiting for a known window to return after a crash. Do not use a retry loop around clicks, keystrokes, or text entry because repeating those could duplicate a user action.
+
+---
+
+### `activate_window`
+
+Brings a previously enumerated window to the foreground by its native handle.
+
+**Parameters:**
+- `handle` - native window handle returned by `list_windows`.
+- `restore` *(default: `true`)* - restore the window first when it is minimized.
+
+**When to use:** Call `list_windows` first, verify the process and title, then activate the exact handle before sending input. Windows uses the native window handle and waits until the OS reports that handle as foreground; Linux uses `wmctrl` or `xdotool`; the current macOS adapter reports a clear unsupported error because its window listing does not expose stable native handles.
+
+---
+
+### `close_window`
+
+Requests a graceful close for one exact top-level window handle. The operation posts the platform's normal close request and then checks whether that handle disappeared. It never terminates the owning process. If the application presents a save dialog or rejects the request, the result contains `closed:false` and explains that the window is still present.
+
+**Parameters:**
+- `handle` - native window handle returned by `list_windows` or `find_windows`.
+- `timeout_ms` *(optional)* - bounded wait from 0 to 5000 milliseconds; defaults to 1000.
+
+**When to use:** Use only after identifying the exact window and confirming that closing it is intended. Prefer this over sending `alt+f4`, because a stale foreground can route a global shortcut to another application.
+
+---
+
+### Targeted desktop input
+
+`move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text` accept an optional `target_handle`. When supplied, the server re-enumerates that exact window immediately before input and sends nothing if it is missing or minimized; clicks, scrolling, and keyboard input additionally require it to be foreground. This turns a focus race into a safe, actionable error. The recommended sequence is `find_windows` → `activate_window` → input with `target_handle`.
+
+---
+
+### Filesystem operations
+
+The filesystem tools make the server useful for general desktop work such as organizing folders. `list_directory` is observation-only, uses an entry limit, and does not follow reparse points during recursive scans. `read_text_file` reads bounded UTF-8 content without changing the file. `create_directory`, `copy_path`, `move_path`, `delete_path`, and `write_text_file` default to `dry_run:true`, returning a normalized plan without changing anything. To apply a mutation, the caller must explicitly pass `dry_run:false` for the exact path that was inspected.
+
+`copy_path` and `move_path` use an exact destination rather than silently treating it as a parent directory. Existing destination directories are never merged, and directories cannot be moved or copied into themselves. `delete_path` is permanent and requires `dry_run:false`; non-empty directories also require `recursive:true`. Dry-run plans do not claim the desktop-control lease, so several safe inspections/plans can run concurrently; the lease is acquired only when a mutation is actually applied. The skill still requires confirmation immediately before destructive deletion when the surrounding user task has not explicitly authorized that exact deletion.
+
+### Semantic UI controls
+
+`find_ui_elements` inspects one exact native window through Windows UI Automation and searches by accessible name, role, or `AutomationId`. It returns a runtime element id, accessible metadata, bounds, and supported patterns such as `invoke`, `toggle`, `select`, `value`, and `expandCollapse`. `invoke_ui_element` and `set_ui_value` re-resolve the element inside the same window immediately before acting, so a stale element id fails instead of being redirected to a different control. The adapter currently requires Windows UI Automation; non-Windows builds return an explicit unsupported-platform error.
+
+### Browser-targeted controls
+
+When a Chromium browser is started with a local `--remote-debugging-port`, `list_browser_tabs` returns exact page target ids, titles, URLs, and debugger endpoints. `wait_for_browser_navigation` waits for one target or URL/title condition with a bounded timeout. `inspect_browser_accessibility` uses CDP's accessibility tree and returns `ax:<nodeId>` ids with roles, names, values, relationships, and DOM mappings. `click_browser_element` and `set_browser_value` re-inspect the same target immediately before acting; setting a value dispatches `input`/`change` but does not press Enter or submit a form. `open_browser_devtools` returns the exact inspector URL and only opens it when `open:true` is supplied. The server accepts only loopback DevTools endpoints and refuses remote WebSocket URLs. Normal browser tabs that were not started with remote debugging remain available to the existing desktop/window tools but are not silently attached through CDP.
+
+### Local Git operations
+
+`git_status`, `git_init`, `git_clone`, `git_create_branch`, and `git_commit` provide bounded local repository workflows. `git_status` is observation-only. The other four default to `dry_run:true`; they return the exact repository, branch, destination, or commit plan and do not contact a remote until a caller explicitly applies the operation. Git arguments are passed directly to the process runner rather than through a shell, so spaces and punctuation in paths or commit messages stay data instead of becoming commands. There is intentionally no automatic push or remote repository deletion in this layer.
+
+### Processes and browser entry points
+
+`list_processes` and `wait_for_process` provide bounded observation for recovery workflows. `launch_application` accepts an executable plus an argument list without shell parsing and defaults to `dry_run:true`. When applied, its returned PID is best-effort: GUI launchers and browsers may reuse an existing process or hand work to another process. Use `wait_for_window` plus a specific title/process identity to find the window the user actually sees. `open_url` accepts only absolute `http` or `https` URLs and also defaults to `dry_run:true`; when explicitly applied, the operating system's default browser handles the URL and any returned PID is likewise best-effort. These tools do not terminate processes and do not implement a force-kill fallback.
+
 ## Performance And Integration Notes
 
 - Screenshot capture avoids temporary files when `path` is omitted.
 - `include_image:false` avoids PNG encoding unless a `path` is supplied.
 - Windows mouse and keyboard actions use batched `SendInput` calls instead of legacy per-event APIs.
 - Windows `hotkey` presses all keys down and releases them in reverse order in one batch.
-- Windows clipboard access retries briefly when another process has the clipboard open.
+- Windows text entry emits direct Unicode input and leaves the clipboard unchanged.
+- Windows activation uses a bounded foreground-stabilization check; activation is reported as failed when the requested handle does not actually become foreground.
+- Desktop input can be bound to an exact `target_handle`; a failed target check aborts before mouse or keyboard injection.
+- `close_window` uses a graceful, handle-directed close request and verifies the postcondition instead of sending a global shortcut or terminating a process.
+- Window enumeration uses at most one retry for observation-only queries; input-changing operations are never retried automatically.
 - Windows visible window enumeration caches process names by PID during each call.
 - Startup enables per-monitor DPI awareness on Windows for correct coordinate and screenshot behavior on mixed-DPI displays.
 - Linux and macOS adapters fail with actionable dependency messages when required desktop commands are missing.
 - Release publishing enables single-file and ReadyToRun output for faster Codex startup.
+- Browser CDP calls are bound to an exact loopback target id and re-resolve accessibility nodes immediately before browser actions.
 
 ## Solution Layout
 
@@ -255,7 +375,7 @@ CodexComputerRunMCPServer\control.lock
 
 On Windows this is normally `%LOCALAPPDATA%\CodexComputerRunMCPServer\control.lock`. On Linux and macOS it follows .NET's local application-data location for the signed-in user, falling back to the temp directory if no local application-data path is available.
 
-The control lease is acquired by `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`. If another Codex session currently owns the lease, the tool call fails with a busy message instead of allowing simultaneous mouse, keyboard, or clipboard input. Observation tools (`screenshot`, `cursor_position`, and `list_windows`) remain available from every session.
+The control lease is acquired by `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`. If another Codex session currently owns the lease, the tool call fails with a busy message instead of allowing simultaneous mouse or keyboard input. Observation tools (`screenshot`, `cursor_position`, and `list_windows`) remain available from every session.
 
 After the latest control action, the owning process keeps the lease briefly so follow-up clicks or keystrokes from the same session are not interleaved with another session. The lease is also released immediately when the owning MCP process exits.
 
@@ -270,6 +390,12 @@ Optional environment overrides:
 | `CODEX_COMPUTER_RUN_IDLE_SHUTDOWN` | `false` | Set `true` to enable idle shutdown. |
 | `CODEX_COMPUTER_RUN_IDLE_TIMEOUT_SECONDS` | `300` | Seconds without tool activity before shutdown when idle shutdown is enabled. Values `0` or lower disable idle shutdown. |
 | `CODEX_COMPUTER_RUN_IDLE_CHECK_INTERVAL_SECONDS` | `10` | Seconds between idle checks. |
+
+### JSONL Action Audit
+
+Auditing is opt-in because desktop actions can involve private applications. Set `CODEX_COMPUTER_RUN_AUDIT=true` to append one JSON object per tool call. The default file is `%LOCALAPPDATA%\CodexComputerRunMCPServer\actions.jsonl` on Windows, or the current platform's local application-data directory. Override it with `CODEX_COMPUTER_RUN_AUDIT_PATH`.
+
+Records include the UTC timestamp, tool name, safe argument metadata, duration, process ID, success state, and a summarized error when a call fails. Text content, screenshot bytes, and full filter values are intentionally omitted; `type_text` records only the character count. Audit write failures are ignored so a diagnostic log cannot break a desktop action or corrupt MCP stdout.
 
 ### Fast Codex Desktop Configuration
 
@@ -399,19 +525,19 @@ dotnet build .\CodexComputerRunMCPServer.slnx --configuration Release --no-resto
 Windows PowerShell:
 
 ```powershell
-dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release
+dotnet test --project .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release
 ```
 
 Linux or macOS:
 
 ```bash
-dotnet test ./src/CodexComputerRunMCPServer.Tests/CodexComputerRunMCPServer.Tests.csproj --configuration Release
+dotnet test --project ./src/CodexComputerRunMCPServer.Tests/CodexComputerRunMCPServer.Tests.csproj --configuration Release
 ```
 
 Coverage with TUnit/Microsoft Testing Platform:
 
 ```powershell
-dotnet test .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release -- --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura --results-directory .\artifacts\test-results
+dotnet test --project .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release -- --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura --results-directory .\artifacts\test-results
 ```
 
 Current verification:
@@ -438,10 +564,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reported all 9 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 40 tools:
 
 ```text
-scroll, hotkey, type_text, screenshot, list_windows, click, move_mouse, press_key, cursor_position
+activate_window, click, click_browser_element, close_window, copy_path, create_directory, cursor_position, delete_path, find_ui_elements, find_windows, git_clone, git_commit, git_create_branch, git_init, git_status, hotkey, inspect_browser_accessibility, invoke_ui_element, launch_application, list_browser_tabs, list_directory, list_processes, list_windows, move_mouse, move_path, open_browser_devtools, open_url, press_key, read_text_file, screenshot, screenshot_window, scroll, set_browser_value, set_ui_value, type_text, verify_window, wait_for_browser_navigation, wait_for_process, wait_for_window, write_text_file
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.
@@ -451,13 +577,21 @@ Live Linux and macOS desktop behavior depends on the active graphical session, i
 Once configured, you can ask things like:
 
 - "Call `screenshot` and describe the active window."
+- "Call `find_windows` for `msedge` with a title containing `Discord`, activate the returned handle, then call `screenshot_window`."
+- "Wait for the identified Notepad window, verify its handle and foreground state, then enter the requested text."
 - "List visible windows and tell me which browser tabs or apps are available."
 - "Move the mouse to `x=400`, `y=300`, click, then take another screenshot."
 - "Press `ctrl+l`, type `https://example.com`, then press `enter`."
-- "Paste this text into the focused editor using `type_text`."
+- "Enter this text into the focused editor using `type_text`."
 - "Scroll down 5 notches and confirm what changed on screen."
 - "Get the cursor position before clicking."
 
 ## Safety Notes
 
 This server controls the active desktop. Mouse, keyboard, and clipboard actions affect the currently focused application. Use it only in a trusted desktop session and pair destructive UI actions with screenshots or window checks first.
+
+### Interaction policy
+
+The bundled Codex Skill distinguishes reversible interface maintenance from data-bearing or destructive actions. When a user explicitly asks to debug a named application, developer mode can continue through low-risk operations such as switching tabs, opening DevTools, reloading an identified page, dismissing a modal, or closing a confirmed empty tab after the target window has been identified. It should not require a separate confirmation for every click in a known sequence.
+
+Developer mode does not remove target-window checks or authorize sending messages, submitting forms, joining calls, deleting data, making purchases, or changing account and security settings. It also must not assume that a tab is empty when it contains unsent text, an upload, an active call, recording, streaming, media playback, or another pending operation.

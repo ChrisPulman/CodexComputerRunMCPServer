@@ -31,9 +31,9 @@ public class McpIntegrationTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(tools.Length).IsEqualTo(9);
+        await Assert.That(tools.Length).IsEqualTo(40);
         await Assert.That(string.Join("|", tools)).IsEqualTo(
-            "click|cursor_position|hotkey|list_windows|move_mouse|press_key|screenshot|scroll|type_text");
+            "activate_window|click|click_browser_element|close_window|copy_path|create_directory|cursor_position|delete_path|find_ui_elements|find_windows|git_clone|git_commit|git_create_branch|git_init|git_status|hotkey|inspect_browser_accessibility|invoke_ui_element|launch_application|list_browser_tabs|list_directory|list_processes|list_windows|move_mouse|move_path|open_browser_devtools|open_url|press_key|read_text_file|screenshot|screenshot_window|scroll|set_browser_value|set_ui_value|type_text|verify_window|wait_for_browser_navigation|wait_for_process|wait_for_window|write_text_file");
     }
 
     [Test]
@@ -66,9 +66,32 @@ public class McpIntegrationTests
         _ = ComputerRunTools.type_text("abc");
         _ = ComputerRunTools.cursor_position();
         _ = ComputerRunTools.list_windows();
+        _ = ComputerRunTools.find_windows(process_name: "notepad", title_contains: "untitled", foreground_only: false, include_minimized: true, limit: 10);
+        _ = ComputerRunTools.activate_window(100, restore: false);
         _ = ComputerRunTools.screenshot(include_image: false);
+        _ = ComputerRunTools.screenshot_window(100, include_image: false);
+        _ = ComputerRunTools.verify_window(100, process_name: "notepad", title_contains: "untitled", require_foreground: true, allow_minimized: false);
+        _ = ComputerRunTools.wait_for_window(process_name: "notepad", title_contains: "untitled", foreground_only: false, include_minimized: true, timeout_ms: 0, poll_ms: 25);
+        _ = ComputerRunTools.close_window(100, timeout_ms: 0);
+        _ = ComputerRunTools.list_directory(Path.GetTempPath(), max_entries: 1);
+        _ = ComputerRunTools.read_text_file(Path.Combine(FindRepositoryRoot(), "README.md"), max_bytes: 128);
+        _ = ComputerRunTools.write_text_file(Path.Combine(Path.GetTempPath(), "codex-computer-run-text-dry-run.txt"), "dry run", dry_run: true);
+        _ = ComputerRunTools.create_directory(Path.Combine(Path.GetTempPath(), "codex-computer-run-dry-run"), dry_run: true);
+        _ = ComputerRunTools.copy_path(AppContext.BaseDirectory, Path.Combine(Path.GetTempPath(), "codex-computer-run-copy-dry-run"), dry_run: true);
+        _ = ComputerRunTools.move_path(AppContext.BaseDirectory, Path.Combine(Path.GetTempPath(), "codex-computer-run-move-dry-run"), dry_run: true);
+        _ = ComputerRunTools.delete_path(Path.GetTempPath(), dry_run: true);
+        var repositoryRoot = FindRepositoryRoot();
+        _ = ComputerRunTools.git_status(repositoryRoot);
+        _ = ComputerRunTools.git_init(Path.Combine(Path.GetTempPath(), "codex-computer-run-git-dry-run"), dry_run: true);
+        _ = ComputerRunTools.git_clone("https://example.test/repo.git", Path.Combine(Path.GetTempPath(), "codex-computer-run-clone-dry-run"), dry_run: true);
+        _ = ComputerRunTools.git_create_branch(repositoryRoot, "feature/codex-dry-run", dry_run: true);
+        _ = ComputerRunTools.git_commit(repositoryRoot, "dry-run commit", dry_run: true);
+        _ = ComputerRunTools.list_processes(process_name: "dotnet", limit: 1);
+        _ = ComputerRunTools.wait_for_process(process_id: Environment.ProcessId, timeout_ms: 0, poll_ms: 25);
+        _ = ComputerRunTools.launch_application("dotnet", ["--version"], dry_run: true);
+        _ = ComputerRunTools.open_url("https://example.test/", dry_run: true);
 
-        await Assert.That(service.Calls).IsEqualTo(9);
+        await Assert.That(service.Calls).IsEqualTo(15);
     }
 
     [Test]
@@ -80,9 +103,9 @@ public class McpIntegrationTests
         var package = root.GetProperty("packages")[0];
 
         await Assert.That(root.GetProperty("name").GetString()).IsEqualTo("io.github.chrispulman/codex-computer-run-mcp-server");
-        await Assert.That(root.GetProperty("version").GetString()).IsEqualTo("1.1.0");
+        await Assert.That(root.GetProperty("version").GetString()).IsEqualTo("1.2.0");
         await Assert.That(package.GetProperty("identifier").GetString()).IsEqualTo("CP.CodexComputerRun.Mcp.Server");
-        await Assert.That(package.GetProperty("version").GetString()).IsEqualTo("1.1.0");
+        await Assert.That(package.GetProperty("version").GetString()).IsEqualTo("1.2.0");
         await Assert.That(package.GetProperty("transport").GetProperty("type").GetString()).IsEqualTo("stdio");
     }
 
@@ -122,43 +145,43 @@ public class McpIntegrationTests
     {
         public int Calls { get; private set; }
 
-        public CallToolResult Screenshot(string? path, bool includeImage)
+        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region)
         {
             Calls++;
             return new CallToolResult { Content = [] };
         }
 
-        public string MoveMouse(int x, int y, double? delay)
+        public string MoveMouse(int x, int y, double? delay, long? targetHandle)
         {
             Calls++;
             return "move";
         }
 
-        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
+        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
         {
             Calls++;
             return "click";
         }
 
-        public string Scroll(int amount, int? x, int? y, double? delay)
+        public string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle)
         {
             Calls++;
             return "scroll";
         }
 
-        public string PressKey(string key, double duration, double? delay)
+        public string PressKey(string key, double duration, double? delay, long? targetHandle)
         {
             Calls++;
             return "press";
         }
 
-        public string Hotkey(string keys, double? delay)
+        public string Hotkey(string keys, double? delay, long? targetHandle)
         {
             Calls++;
             return "hotkey";
         }
 
-        public string TypeText(string text, double? delay)
+        public string TypeText(string text, double? delay, long? targetHandle)
         {
             Calls++;
             return "type";
@@ -174,6 +197,42 @@ public class McpIntegrationTests
         {
             Calls++;
             return "[]";
+        }
+
+        public string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit)
+        {
+            Calls++;
+            return "[]";
+        }
+
+        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage)
+        {
+            Calls++;
+            return new CallToolResult { Content = [] };
+        }
+
+        public string VerifyWindow(long handle, string? processName, string? titleContains, bool requireForeground, bool allowMinimized)
+        {
+            Calls++;
+            return "{}";
+        }
+
+        public string WaitForWindow(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int timeoutMilliseconds, int pollMilliseconds)
+        {
+            Calls++;
+            return "{}";
+        }
+
+        public string ActivateWindow(long handle, bool restore)
+        {
+            Calls++;
+            return "activate";
+        }
+
+        public string CloseWindow(long handle, int timeoutMilliseconds)
+        {
+            Calls++;
+            return "close";
         }
     }
 }

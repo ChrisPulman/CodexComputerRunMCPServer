@@ -155,6 +155,27 @@ public class ComputerRunLifecycleTests
         await Assert.That(service.MoveCalls).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task DryRunMutations_DoNotClaimDesktopControlLease()
+    {
+        using var runtimeLock = await RuntimeMutationLock.AcquireAsync();
+        var lockFilePath = Path.Combine(
+            Path.GetTempPath(),
+            "codex-computer-run-tests",
+            Guid.NewGuid().ToString("N"),
+            "control.lock");
+
+        using var competingLease = new DesktopControlLease(enabled: true, TimeSpan.FromMinutes(1), lockFilePath);
+        using var competingControl = competingLease.BeginControlInvocation();
+        using var restoreLease = ComputerRunToolRuntime.ReplaceControlLeaseForTests(
+            new DesktopControlLease(enabled: true, TimeSpan.FromMinutes(1), lockFilePath));
+
+        _ = ComputerRunTools.create_directory(Path.Combine(Path.GetTempPath(), "codex-computer-run-dry-run"), dry_run: true);
+        _ = ComputerRunTools.git_init(Path.Combine(Path.GetTempPath(), "codex-computer-run-git-dry-run"), dry_run: true);
+        _ = ComputerRunTools.launch_application("dotnet", ["--version"], dry_run: true);
+        _ = ComputerRunTools.open_url("https://example.test/", dry_run: true);
+    }
+
     private sealed class ManualTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         private DateTimeOffset _utcNow = utcNow;
@@ -174,22 +195,37 @@ public class ComputerRunLifecycleTests
             return "{}";
         }
 
-        public CallToolResult Screenshot(string? path, bool includeImage) => throw new NotSupportedException();
+        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region) => throw new NotSupportedException();
 
-        public string MoveMouse(int x, int y, double? delay) => throw new NotSupportedException();
+        public string MoveMouse(int x, int y, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
+        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
             => throw new NotSupportedException();
 
-        public string Scroll(int amount, int? x, int? y, double? delay) => throw new NotSupportedException();
+        public string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string PressKey(string key, double duration, double? delay) => throw new NotSupportedException();
+        public string PressKey(string key, double duration, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string Hotkey(string keys, double? delay) => throw new NotSupportedException();
+        public string Hotkey(string keys, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string TypeText(string text, double? delay) => throw new NotSupportedException();
+        public string TypeText(string text, double? delay, long? targetHandle) => throw new NotSupportedException();
 
         public string ListWindows(int limit) => throw new NotSupportedException();
+
+        public string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit)
+            => throw new NotSupportedException();
+
+        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage) => throw new NotSupportedException();
+
+        public string VerifyWindow(long handle, string? processName, string? titleContains, bool requireForeground, bool allowMinimized)
+            => throw new NotSupportedException();
+
+        public string WaitForWindow(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int timeoutMilliseconds, int pollMilliseconds)
+            => throw new NotSupportedException();
+
+        public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
+
+        public string CloseWindow(long handle, int timeoutMilliseconds) => throw new NotSupportedException();
     }
 
     private sealed class ControlLeaseInspectingService : IComputerRunService
@@ -204,25 +240,40 @@ public class ComputerRunLifecycleTests
             return "{}";
         }
 
-        public string MoveMouse(int x, int y, double? delay)
+        public string MoveMouse(int x, int y, double? delay, long? targetHandle)
         {
             MoveCalls++;
             return "move";
         }
 
-        public CallToolResult Screenshot(string? path, bool includeImage) => throw new NotSupportedException();
+        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region) => throw new NotSupportedException();
 
-        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
+        public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
             => throw new NotSupportedException();
 
-        public string Scroll(int amount, int? x, int? y, double? delay) => throw new NotSupportedException();
+        public string Scroll(int amount, int? x, int? y, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string PressKey(string key, double duration, double? delay) => throw new NotSupportedException();
+        public string PressKey(string key, double duration, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string Hotkey(string keys, double? delay) => throw new NotSupportedException();
+        public string Hotkey(string keys, double? delay, long? targetHandle) => throw new NotSupportedException();
 
-        public string TypeText(string text, double? delay) => throw new NotSupportedException();
+        public string TypeText(string text, double? delay, long? targetHandle) => throw new NotSupportedException();
 
         public string ListWindows(int limit) => throw new NotSupportedException();
+
+        public string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit)
+            => throw new NotSupportedException();
+
+        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage) => throw new NotSupportedException();
+
+        public string VerifyWindow(long handle, string? processName, string? titleContains, bool requireForeground, bool allowMinimized)
+            => throw new NotSupportedException();
+
+        public string WaitForWindow(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int timeoutMilliseconds, int pollMilliseconds)
+            => throw new NotSupportedException();
+
+        public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
+
+        public string CloseWindow(long handle, int timeoutMilliseconds) => throw new NotSupportedException();
     }
 }
