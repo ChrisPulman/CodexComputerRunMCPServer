@@ -316,6 +316,10 @@ The filesystem tools make the server useful for general desktop work such as org
 
 `find_ui_elements` inspects one exact native window through Windows UI Automation and searches by accessible name, role, or `AutomationId`. It returns a runtime element id, accessible metadata, bounds, and supported patterns such as `invoke`, `toggle`, `select`, `value`, and `expandCollapse`. `invoke_ui_element` and `set_ui_value` re-resolve the element inside the same window immediately before acting, so a stale element id fails instead of being redirected to a different control. The adapter currently requires Windows UI Automation; non-Windows builds return an explicit unsupported-platform error.
 
+### Browser-targeted controls
+
+When a Chromium browser is started with a local `--remote-debugging-port`, `list_browser_tabs` returns exact page target ids, titles, URLs, and debugger endpoints. `wait_for_browser_navigation` waits for one target or URL/title condition with a bounded timeout. `inspect_browser_accessibility` uses CDP's accessibility tree and returns `ax:<nodeId>` ids with roles, names, values, relationships, and DOM mappings. `click_browser_element` and `set_browser_value` re-inspect the same target immediately before acting; setting a value dispatches `input`/`change` but does not press Enter or submit a form. `open_browser_devtools` returns the exact inspector URL and only opens it when `open:true` is supplied. The server accepts only loopback DevTools endpoints and refuses remote WebSocket URLs. Normal browser tabs that were not started with remote debugging remain available to the existing desktop/window tools but are not silently attached through CDP.
+
 ### Local Git operations
 
 `git_status`, `git_init`, `git_clone`, `git_create_branch`, and `git_commit` provide bounded local repository workflows. `git_status` is observation-only. The other four default to `dry_run:true`; they return the exact repository, branch, destination, or commit plan and do not contact a remote until a caller explicitly applies the operation. Git arguments are passed directly to the process runner rather than through a shell, so spaces and punctuation in paths or commit messages stay data instead of becoming commands. There is intentionally no automatic push or remote repository deletion in this layer.
@@ -339,6 +343,7 @@ The filesystem tools make the server useful for general desktop work such as org
 - Startup enables per-monitor DPI awareness on Windows for correct coordinate and screenshot behavior on mixed-DPI displays.
 - Linux and macOS adapters fail with actionable dependency messages when required desktop commands are missing.
 - Release publishing enables single-file and ReadyToRun output for faster Codex startup.
+- Browser CDP calls are bound to an exact loopback target id and re-resolve accessibility nodes immediately before browser actions.
 
 ## Solution Layout
 
@@ -559,10 +564,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 34 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 40 tools:
 
 ```text
-activate_window, click, close_window, copy_path, create_directory, cursor_position, delete_path, find_ui_elements, find_windows, git_clone, git_commit, git_create_branch, git_init, git_status, hotkey, invoke_ui_element, launch_application, list_directory, list_processes, list_windows, move_mouse, move_path, open_url, press_key, read_text_file, screenshot, screenshot_window, scroll, set_ui_value, type_text, verify_window, wait_for_process, wait_for_window, write_text_file
+activate_window, click, click_browser_element, close_window, copy_path, create_directory, cursor_position, delete_path, find_ui_elements, find_windows, git_clone, git_commit, git_create_branch, git_init, git_status, hotkey, inspect_browser_accessibility, invoke_ui_element, launch_application, list_browser_tabs, list_directory, list_processes, list_windows, move_mouse, move_path, open_browser_devtools, open_url, press_key, read_text_file, screenshot, screenshot_window, scroll, set_browser_value, set_ui_value, type_text, verify_window, wait_for_browser_navigation, wait_for_process, wait_for_window, write_text_file
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.

@@ -266,6 +266,92 @@ public static class ComputerRunTools
             () => SemanticService.SetValue(window_handle, element_id ?? string.Empty, value ?? string.Empty));
 
     /// <summary>
+    /// Lists page targets exposed by a local Chromium DevTools endpoint.
+    /// </summary>
+    [McpServerTool]
+    [Description("List browser tabs from a local Chromium DevTools endpoint. The browser must have been started with --remote-debugging-port; results include exact target ids for later calls.")]
+    public static string list_browser_tabs(
+        [Description("Local browser DevTools port, normally 9222.")] int debug_port = 9222)
+        => InvokeSemanticObservation(
+            "list_browser_tabs",
+            new { debug_port },
+            () => BrowserService.ListTabs(debug_port));
+
+    /// <summary>
+    /// Waits for one exact browser target to appear with matching URL or title metadata.
+    /// </summary>
+    [McpServerTool]
+    [Description("Wait for a specific browser target or URL/title condition on a local DevTools endpoint. The wait is bounded to 30 seconds and does not send input.")]
+    public static string wait_for_browser_navigation(
+        [Description("Optional exact target id returned by list_browser_tabs.")] string? target_id = null,
+        [Description("Optional case-insensitive URL substring to wait for.")] string? url_contains = null,
+        [Description("Optional case-insensitive title substring to wait for.")] string? title_contains = null,
+        [Description("Local browser DevTools port, normally 9222.")] int debug_port = 9222,
+        [Description("Maximum wait in milliseconds, from 0 to 30000.")] int timeout_ms = 5000,
+        [Description("Polling interval in milliseconds, from 25 to 1000.")] int poll_ms = 100)
+        => InvokeSemanticObservation(
+            "wait_for_browser_navigation",
+            new { hasTargetId = !string.IsNullOrWhiteSpace(target_id), hasUrlFilter = !string.IsNullOrWhiteSpace(url_contains), hasTitleFilter = !string.IsNullOrWhiteSpace(title_contains), debug_port, timeout_ms, poll_ms },
+            () => BrowserService.WaitForNavigation(target_id, url_contains, title_contains, debug_port, timeout_ms, poll_ms));
+
+    /// <summary>
+    /// Inspects the accessibility tree of one exact browser page target.
+    /// </summary>
+    [McpServerTool]
+    [Description("Inspect a browser page's accessibility tree through CDP and return semantic ax:<nodeId> element ids, roles, names, values, and DOM mappings. Reinspect before acting because ids can become stale after navigation.")]
+    public static string inspect_browser_accessibility(
+        [Description("Exact page target id returned by list_browser_tabs.")] string target_id,
+        [Description("Local browser DevTools port, normally 9222.")] int debug_port = 9222,
+        [Description("Maximum accessibility nodes to return, from 1 to 2000.")] int max_nodes = 500)
+        => InvokeSemanticObservation(
+            "inspect_browser_accessibility",
+            new { targetIdLength = target_id?.Length ?? 0, debug_port, max_nodes },
+            () => BrowserService.InspectAccessibility(target_id ?? string.Empty, debug_port, max_nodes));
+
+    /// <summary>
+    /// Clicks a current browser accessibility element through its mapped DOM node.
+    /// </summary>
+    [McpServerTool]
+    [Description("Click a browser element identified by inspect_browser_accessibility. The exact target id is required and the accessibility element is re-resolved immediately before the click.")]
+    public static string click_browser_element(
+        [Description("Exact page target id returned by list_browser_tabs.")] string target_id,
+        [Description("ax:<nodeId> returned by inspect_browser_accessibility.")] string element_id,
+        [Description("Local browser DevTools port, normally 9222.")] int debug_port = 9222)
+        => InvokeSemanticControl(
+            "click_browser_element",
+            new { targetIdLength = target_id?.Length ?? 0, elementIdLength = element_id?.Length ?? 0, debug_port },
+            () => BrowserService.ClickElement(target_id ?? string.Empty, element_id ?? string.Empty, debug_port));
+
+    /// <summary>
+    /// Sets a current browser value element and dispatches input/change events without submitting a form.
+    /// </summary>
+    [McpServerTool]
+    [Description("Set a browser input or contenteditable value identified by inspect_browser_accessibility. It re-resolves the exact element and dispatches input/change events, but does not press Enter or submit a form.")]
+    public static string set_browser_value(
+        [Description("Exact page target id returned by list_browser_tabs.")] string target_id,
+        [Description("ax:<nodeId> returned by inspect_browser_accessibility.")] string element_id,
+        [Description("New value. The value is not written to the audit log.")] string value,
+        [Description("Local browser DevTools port, normally 9222.")] int debug_port = 9222)
+        => InvokeSemanticControl(
+            "set_browser_value",
+            new { targetIdLength = target_id?.Length ?? 0, elementIdLength = element_id?.Length ?? 0, valueLength = value?.Length ?? 0, debug_port },
+            () => BrowserService.SetValue(target_id ?? string.Empty, element_id ?? string.Empty, value ?? string.Empty, debug_port));
+
+    /// <summary>
+    /// Builds the DevTools inspector URL for one exact browser target and optionally opens it.
+    /// </summary>
+    [McpServerTool]
+    [Description("Build the local DevTools inspector URL for an exact browser target. Set open=true only when opening the inspector is intended; the default returns the URL without opening anything.")]
+    public static string open_browser_devtools(
+        [Description("Exact page target id returned by list_browser_tabs.")] string target_id,
+        [Description("Local browser DevTools port, normally 9222.")] int debug_port = 9222,
+        [Description("Open the inspector URL through the operating system's default browser.")] bool open = false)
+        => InvokeSemanticControl(
+            "open_browser_devtools",
+            new { targetIdLength = target_id?.Length ?? 0, debug_port, open },
+            () => BrowserService.OpenDevTools(target_id ?? string.Empty, debug_port, open));
+
+    /// <summary>
     /// Brings a window returned by <see cref="list_windows"/> to the foreground.
     /// </summary>
     /// <param name="handle">Native window handle returned by list_windows.</param>

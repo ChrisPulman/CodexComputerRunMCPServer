@@ -31,9 +31,9 @@ public class McpIntegrationTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(tools.Length).IsEqualTo(34);
+        await Assert.That(tools.Length).IsEqualTo(40);
         await Assert.That(string.Join("|", tools)).IsEqualTo(
-            "activate_window|click|close_window|copy_path|create_directory|cursor_position|delete_path|find_ui_elements|find_windows|git_clone|git_commit|git_create_branch|git_init|git_status|hotkey|invoke_ui_element|launch_application|list_directory|list_processes|list_windows|move_mouse|move_path|open_url|press_key|read_text_file|screenshot|screenshot_window|scroll|set_ui_value|type_text|verify_window|wait_for_process|wait_for_window|write_text_file");
+            "activate_window|click|click_browser_element|close_window|copy_path|create_directory|cursor_position|delete_path|find_ui_elements|find_windows|git_clone|git_commit|git_create_branch|git_init|git_status|hotkey|inspect_browser_accessibility|invoke_ui_element|launch_application|list_browser_tabs|list_directory|list_processes|list_windows|move_mouse|move_path|open_browser_devtools|open_url|press_key|read_text_file|screenshot|screenshot_window|scroll|set_browser_value|set_ui_value|type_text|verify_window|wait_for_browser_navigation|wait_for_process|wait_for_window|write_text_file");
     }
 
     [Test]

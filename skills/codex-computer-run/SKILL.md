@@ -1,6 +1,6 @@
 ---
 name: codex-computer-run
-description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, metadata-based window targeting, bounded window waits, pre/post window verification, safe graceful window closing, bounded filesystem and local Git organization, process recovery, browser URL entry points, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text entry into focused applications.
+description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, semantic native controls, exact browser-tab targeting through local CDP, bounded navigation waits, accessibility inspection, metadata-based window targeting, bounded window waits, pre/post window verification, safe graceful window closing, bounded filesystem and local Git organization, process recovery, browser URL entry points, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text entry into focused applications.
 ---
 
 # Codex Computer Run
@@ -25,7 +25,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 
 - Prefer the `mcp__codex_computer_run__` namespace when available.
 - If tools are deferred, search for `ComputerRun`, `codex computer run`, or `desktop screenshot mouse keyboard` and choose the namespace that exposes the complete tool set.
-- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `verify_window`, `wait_for_window`, `find_ui_elements`, `activate_window`, `invoke_ui_element`, `set_ui_value`, `close_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, `type_text`, `list_directory`, `read_text_file`, `create_directory`, `copy_path`, `move_path`, `delete_path`, `write_text_file`, `git_status`, `git_init`, `git_clone`, `git_create_branch`, `git_commit`, `list_processes`, `wait_for_process`, `launch_application`, and `open_url`.
+- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `verify_window`, `wait_for_window`, `find_ui_elements`, `activate_window`, `invoke_ui_element`, `set_ui_value`, `list_browser_tabs`, `wait_for_browser_navigation`, `inspect_browser_accessibility`, `click_browser_element`, `set_browser_value`, `open_browser_devtools`, `close_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, `type_text`, `list_directory`, `read_text_file`, `create_directory`, `copy_path`, `move_path`, `delete_path`, `write_text_file`, `git_status`, `git_init`, `git_clone`, `git_create_branch`, `git_commit`, `list_processes`, `wait_for_process`, `launch_application`, and `open_url`.
 - If the MCP tools are unavailable, state that the Computer Run server is not configured in the current session instead of simulating desktop interaction with unrelated shell commands.
 
 ## Platform Notes
@@ -60,6 +60,8 @@ The policy changes how much repetitive confirmation and screenshot checking is n
     - Use `list_processes` or `wait_for_process` to observe application recovery. Use `launch_application` and `open_url` in dry-run mode first; only apply the exact executable/URL after confirming the requested launch.
     - Use `read_text_file` for bounded UTF-8 inspection. Use `write_text_file` in dry-run mode first and require `overwrite:true` for an existing file; it writes through a temporary file and replaces the destination atomically when applied.
     - Use `find_ui_elements` with a verified window handle before acting on native controls. Reuse only the returned element id with the same window; `invoke_ui_element` and `set_ui_value` revalidate it before changing UI state.
+   - For browser-specific work, use `list_browser_tabs` only against a browser started with a local `--remote-debugging-port`, select one exact page target id, and call `inspect_browser_accessibility` before using `click_browser_element` or `set_browser_value`. Reinspect after navigation because `ax:<nodeId>` ids are target-local and can become stale.
+   - Use `wait_for_browser_navigation` instead of guessing that a browser navigation has finished. Use `open_browser_devtools` with `open:false` to obtain an inspector URL without opening it; pass `open:true` only when opening that exact target's DevTools is intended.
 4. Verify after meaningful actions:
    - In normal mode, use `screenshot` after navigation, clicks, scrolls, or text entry when the resulting state matters.
    - In developer mode, do not capture after every low-risk click when the target and action sequence are already known. Capture after navigation, a meaningful UI transition, a failed action, an unexpected focus change, or before/after a potentially data-bearing action.
@@ -81,6 +83,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 - Do not use a global `alt+f4` as a substitute for `close_window` when the intended window can be identified by handle.
 - Do not use a broad recursive filesystem operation when a narrower exact path will work. `delete_path` is permanent; require an explicit user-confirmed target before passing `dry_run:false`, and pass `recursive:true` only for a confirmed non-empty directory.
 - Do not use `launch_application` with a shell interpreter to bypass argument boundaries, and do not treat `open_url` as permission to submit forms or alter account state in the browser.
+- Do not attach CDP to a remote host or use a browser target id from a different target. A browser-specific action must be re-resolved against the exact target immediately before acting.
 - On Windows, `type_text` does not change the clipboard. On Linux/macOS, check the platform fallback before using it when preserving clipboard contents matters.
 - Keep delays short but use the optional `delay` parameter after actions that trigger UI transitions.
 - The server may retry observation-only window enumeration once, but never automatically retries clicks, key presses, hotkeys, scrolling, or text entry.
