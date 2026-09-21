@@ -7,7 +7,7 @@
     <PackageId>CP.CodexComputerRun.Mcp.Server</PackageId>
     <Version>1.1.0</Version>
     <Title>Codex Computer Run MCP Server</Title>
-    <Description>MCP server for Codex desktop control and general workstation automation: screenshots, mouse, keyboard, Unicode text entry, window discovery, graceful close, bounded filesystem organization, and a bundled Codex Skill. Windows uses native Win32 APIs; Linux and macOS use best-effort desktop command adapters.</Description>
+    <Description>MCP server for Codex desktop control and general workstation automation: screenshots, mouse, keyboard, Unicode text entry, window discovery, graceful close, bounded filesystem organization, local Git workflows, and a bundled Codex Skill. Windows uses native Win32 APIs; Linux and macOS use best-effort desktop command adapters.</Description>
     <Authors>Chris Pulman</Authors>
     <PackageProjectUrl>https://github.com/ChrisPulman/CodexComputerRunMCPServer</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ChrisPulman/CodexComputerRunMCPServer</RepositoryUrl>

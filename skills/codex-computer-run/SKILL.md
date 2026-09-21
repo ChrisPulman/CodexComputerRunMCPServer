@@ -1,6 +1,6 @@
 ---
 name: codex-computer-run
-description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, metadata-based window targeting, bounded window waits, pre/post window verification, safe graceful window closing, bounded filesystem organization, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text entry into focused applications.
+description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, metadata-based window targeting, bounded window waits, pre/post window verification, safe graceful window closing, bounded filesystem and local Git organization, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text entry into focused applications.
 ---
 
 # Codex Computer Run
@@ -25,7 +25,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 
 - Prefer the `mcp__codex_computer_run__` namespace when available.
 - If tools are deferred, search for `ComputerRun`, `codex computer run`, or `desktop screenshot mouse keyboard` and choose the namespace that exposes the complete tool set.
-- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `verify_window`, `wait_for_window`, `activate_window`, `close_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, `type_text`, `list_directory`, `create_directory`, `copy_path`, `move_path`, and `delete_path`.
+- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `verify_window`, `wait_for_window`, `activate_window`, `close_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, `type_text`, `list_directory`, `create_directory`, `copy_path`, `move_path`, `delete_path`, `git_status`, `git_init`, `git_clone`, `git_create_branch`, and `git_commit`.
 - If the MCP tools are unavailable, state that the Computer Run server is not configured in the current session instead of simulating desktop interaction with unrelated shell commands.
 
 ## Platform Notes
@@ -56,6 +56,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
     - Use `close_window` for an explicitly identified window instead of a global `alt+f4`; it requests a graceful close and reports if a save prompt keeps the window alive.
     - Use `list_directory` before changing files or folders. It is bounded and observation-only.
     - Use `create_directory`, `copy_path`, `move_path`, and `delete_path` first with their default `dry_run:true`, inspect the normalized plan, and only then apply the exact requested mutation with `dry_run:false`.
+    - Use `git_status` before repository changes. Use `git_init`, `git_clone`, `git_create_branch`, and `git_commit` in dry-run mode first; they never push or delete a remote repository.
 4. Verify after meaningful actions:
    - In normal mode, use `screenshot` after navigation, clicks, scrolls, or text entry when the resulting state matters.
    - In developer mode, do not capture after every low-risk click when the target and action sequence are already known. Capture after navigation, a meaningful UI transition, a failed action, an unexpected focus change, or before/after a potentially data-bearing action.

@@ -31,9 +31,9 @@ public class McpIntegrationTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(tools.Length).IsEqualTo(20);
+        await Assert.That(tools.Length).IsEqualTo(25);
         await Assert.That(string.Join("|", tools)).IsEqualTo(
-            "activate_window|click|close_window|copy_path|create_directory|cursor_position|delete_path|find_windows|hotkey|list_directory|list_windows|move_mouse|move_path|press_key|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_window");
+            "activate_window|click|close_window|copy_path|create_directory|cursor_position|delete_path|find_windows|git_clone|git_commit|git_create_branch|git_init|git_status|hotkey|list_directory|list_windows|move_mouse|move_path|press_key|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_window");
     }
 
     [Test]
@@ -78,6 +78,12 @@ public class McpIntegrationTests
         _ = ComputerRunTools.copy_path(AppContext.BaseDirectory, Path.Combine(Path.GetTempPath(), "codex-computer-run-copy-dry-run"), dry_run: true);
         _ = ComputerRunTools.move_path(AppContext.BaseDirectory, Path.Combine(Path.GetTempPath(), "codex-computer-run-move-dry-run"), dry_run: true);
         _ = ComputerRunTools.delete_path(Path.GetTempPath(), dry_run: true);
+        var repositoryRoot = FindRepositoryRoot();
+        _ = ComputerRunTools.git_status(repositoryRoot);
+        _ = ComputerRunTools.git_init(Path.Combine(Path.GetTempPath(), "codex-computer-run-git-dry-run"), dry_run: true);
+        _ = ComputerRunTools.git_clone("https://example.test/repo.git", Path.Combine(Path.GetTempPath(), "codex-computer-run-clone-dry-run"), dry_run: true);
+        _ = ComputerRunTools.git_create_branch(repositoryRoot, "feature/codex-dry-run", dry_run: true);
+        _ = ComputerRunTools.git_commit(repositoryRoot, "dry-run commit", dry_run: true);
 
         await Assert.That(service.Calls).IsEqualTo(15);
     }

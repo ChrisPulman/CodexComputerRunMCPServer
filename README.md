@@ -312,6 +312,10 @@ The filesystem tools make the server useful for general desktop work such as org
 
 `copy_path` and `move_path` use an exact destination rather than silently treating it as a parent directory. Existing destination directories are never merged, and directories cannot be moved or copied into themselves. `delete_path` is permanent and requires `dry_run:false`; non-empty directories also require `recursive:true`. The skill still requires confirmation immediately before destructive deletion when the surrounding user task has not explicitly authorized that exact deletion.
 
+### Local Git operations
+
+`git_status`, `git_init`, `git_clone`, `git_create_branch`, and `git_commit` provide bounded local repository workflows. `git_status` is observation-only. The other four default to `dry_run:true`; they return the exact repository, branch, destination, or commit plan and do not contact a remote until a caller explicitly applies the operation. Git arguments are passed directly to the process runner rather than through a shell, so spaces and punctuation in paths or commit messages stay data instead of becoming commands. There is intentionally no automatic push or remote repository deletion in this layer.
+
 ## Performance And Integration Notes
 
 - Screenshot capture avoids temporary files when `path` is omitted.
@@ -547,10 +551,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 20 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 25 tools:
 
 ```text
-activate_window, close_window, copy_path, create_directory, delete_path, list_directory, move_path, scroll, hotkey, type_text, screenshot, list_windows, find_windows, screenshot_window, verify_window, wait_for_window, click, move_mouse, press_key, cursor_position
+activate_window, close_window, copy_path, create_directory, delete_path, git_clone, git_commit, git_create_branch, git_init, git_status, list_directory, move_path, scroll, hotkey, type_text, screenshot, list_windows, find_windows, screenshot_window, verify_window, wait_for_window, click, move_mouse, press_key, cursor_position
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.

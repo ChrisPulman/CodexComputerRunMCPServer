@@ -300,6 +300,61 @@ public static class ComputerRunTools
         [Description("When true, only return the plan; when false, permanently delete the exact path.")] bool dry_run = true)
         => InvokeFileMutation("delete_path", new { hasPath = !string.IsNullOrWhiteSpace(path), recursive, dry_run }, () => FileSystemService.DeletePath(path, recursive, dry_run));
 
+    /// <summary>
+    /// Reads local Git status without changing the repository.
+    /// </summary>
+    [McpServerTool]
+    [Description("Return local Git branch and change status for an existing repository. This is observation-only and never stages, commits, or pushes.")]
+    public static string git_status(
+        [Description("Existing local repository directory.")] string repo_path)
+        => InvokeGitObservation("git_status", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path) }, () => GitService.CreateDefault().Status(repo_path));
+
+    /// <summary>
+    /// Initializes a local Git repository, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Create a local Git repository. dry_run defaults to true; it never contacts a remote and does not create files until false is explicitly supplied.")]
+    public static string git_init(
+        [Description("Repository directory to initialize.")] string repo_path,
+        [Description("Create a bare repository instead of a working-tree repository.")] bool bare = false,
+        [Description("When true, only return the plan; when false, run git init.")] bool dry_run = true)
+        => InvokeGitMutation("git_init", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path), bare, dry_run }, () => GitService.CreateDefault().Init(repo_path, bare, dry_run));
+
+    /// <summary>
+    /// Clones a local or remote Git repository, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Clone a Git URL or local source to an exact destination. dry_run defaults to true; no network or filesystem clone occurs until false is explicitly supplied.")]
+    public static string git_clone(
+        [Description("Git URL or local source path.")] string url,
+        [Description("New destination directory, which must not already exist.")] string destination,
+        [Description("When true, only return the plan; when false, run git clone.")] bool dry_run = true)
+        => InvokeGitMutation("git_clone", new { hasUrl = !string.IsNullOrWhiteSpace(url), hasDestination = !string.IsNullOrWhiteSpace(destination), dry_run }, () => GitService.CreateDefault().Clone(url, destination, dry_run));
+
+    /// <summary>
+    /// Creates a local Git branch, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Create a local Git branch after validating its ref name. dry_run defaults to true; checkout is optional and no remote is touched.")]
+    public static string git_create_branch(
+        [Description("Existing local repository directory.")] string repo_path,
+        [Description("Branch name to validate and create.")] string branch,
+        [Description("Switch to the new branch after creating it when dry_run is false.")] bool checkout = false,
+        [Description("When true, only return the plan; when false, create the branch.")] bool dry_run = true)
+        => InvokeGitMutation("git_create_branch", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path), branchLength = branch?.Length ?? 0, checkout, dry_run }, () => GitService.CreateDefault().CreateBranch(repo_path, branch ?? string.Empty, checkout, dry_run));
+
+    /// <summary>
+    /// Commits local Git changes, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Create a local Git commit. dry_run defaults to true; stage_all defaults to false so unstaged user files are not silently added. This tool never pushes.")]
+    public static string git_commit(
+        [Description("Existing local repository directory.")] string repo_path,
+        [Description("Non-empty commit message.")] string message,
+        [Description("Stage all tracked and untracked changes before committing when dry_run is false.")] bool stage_all = false,
+        [Description("When true, only return the current status plan; when false, stage optionally and commit locally.")] bool dry_run = true)
+        => InvokeGitMutation("git_commit", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path), messageLength = message?.Length ?? 0, stage_all, dry_run }, () => GitService.CreateDefault().Commit(repo_path, message ?? string.Empty, stage_all, dry_run));
+
     private static TResult Invoke<TResult>(string tool, object? arguments, Func<IComputerRunService, TResult> action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -323,6 +378,21 @@ public static class ComputerRunTools
     }
 
     private static TResult InvokeFileMutation<TResult>(string tool, object? arguments, Func<TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        using var control = ComputerRunToolRuntime.BeginDesktopControlInvocation();
+        return ComputerRunAuditLogger.Execute(tool, arguments, action);
+    }
+
+    private static TResult InvokeGitObservation<TResult>(string tool, object? arguments, Func<TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        return ComputerRunAuditLogger.Execute(tool, arguments, action);
+    }
+
+    private static TResult InvokeGitMutation<TResult>(string tool, object? arguments, Func<TResult> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
