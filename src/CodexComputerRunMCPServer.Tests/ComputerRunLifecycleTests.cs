@@ -155,6 +155,27 @@ public class ComputerRunLifecycleTests
         await Assert.That(service.MoveCalls).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task DryRunMutations_DoNotClaimDesktopControlLease()
+    {
+        using var runtimeLock = await RuntimeMutationLock.AcquireAsync();
+        var lockFilePath = Path.Combine(
+            Path.GetTempPath(),
+            "codex-computer-run-tests",
+            Guid.NewGuid().ToString("N"),
+            "control.lock");
+
+        using var competingLease = new DesktopControlLease(enabled: true, TimeSpan.FromMinutes(1), lockFilePath);
+        using var competingControl = competingLease.BeginControlInvocation();
+        using var restoreLease = ComputerRunToolRuntime.ReplaceControlLeaseForTests(
+            new DesktopControlLease(enabled: true, TimeSpan.FromMinutes(1), lockFilePath));
+
+        _ = ComputerRunTools.create_directory(Path.Combine(Path.GetTempPath(), "codex-computer-run-dry-run"), dry_run: true);
+        _ = ComputerRunTools.git_init(Path.Combine(Path.GetTempPath(), "codex-computer-run-git-dry-run"), dry_run: true);
+        _ = ComputerRunTools.launch_application("dotnet", ["--version"], dry_run: true);
+        _ = ComputerRunTools.open_url("https://example.test/", dry_run: true);
+    }
+
     private sealed class ManualTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         private DateTimeOffset _utcNow = utcNow;

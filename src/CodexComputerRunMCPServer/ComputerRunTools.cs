@@ -263,7 +263,7 @@ public static class ComputerRunTools
     public static string create_directory(
         [Description("Directory path to create.")] string path,
         [Description("When true, only return the plan; when false, create the directory.")] bool dry_run = true)
-        => InvokeFileMutation("create_directory", new { hasPath = !string.IsNullOrWhiteSpace(path), dry_run }, () => FileSystemService.CreateDirectory(path, dry_run));
+        => InvokeFileMutation("create_directory", new { hasPath = !string.IsNullOrWhiteSpace(path), dry_run }, dry_run, () => FileSystemService.CreateDirectory(path, dry_run));
 
     /// <summary>
     /// Copies a file or directory, or returns a dry-run plan by default.
@@ -275,7 +275,7 @@ public static class ComputerRunTools
         [Description("Exact destination path, not an implicit parent directory.")] string destination,
         [Description("Allow an existing destination file to be replaced. Existing destination directories are never merged.")] bool overwrite = false,
         [Description("When true, only return the plan; when false, perform the copy.")] bool dry_run = true)
-        => InvokeFileMutation("copy_path", new { hasSource = !string.IsNullOrWhiteSpace(source), hasDestination = !string.IsNullOrWhiteSpace(destination), overwrite, dry_run }, () => FileSystemService.CopyPath(source, destination, overwrite, dry_run));
+        => InvokeFileMutation("copy_path", new { hasSource = !string.IsNullOrWhiteSpace(source), hasDestination = !string.IsNullOrWhiteSpace(destination), overwrite, dry_run }, dry_run, () => FileSystemService.CopyPath(source, destination, overwrite, dry_run));
 
     /// <summary>
     /// Moves or renames a file or directory, or returns a dry-run plan by default.
@@ -287,7 +287,7 @@ public static class ComputerRunTools
         [Description("Exact destination path, not an implicit parent directory.")] string destination,
         [Description("Allow an existing destination file to be replaced. Existing destination directories are never merged.")] bool overwrite = false,
         [Description("When true, only return the plan; when false, perform the move.")] bool dry_run = true)
-        => InvokeFileMutation("move_path", new { hasSource = !string.IsNullOrWhiteSpace(source), hasDestination = !string.IsNullOrWhiteSpace(destination), overwrite, dry_run }, () => FileSystemService.MovePath(source, destination, overwrite, dry_run));
+        => InvokeFileMutation("move_path", new { hasSource = !string.IsNullOrWhiteSpace(source), hasDestination = !string.IsNullOrWhiteSpace(destination), overwrite, dry_run }, dry_run, () => FileSystemService.MovePath(source, destination, overwrite, dry_run));
 
     /// <summary>
     /// Deletes a file or directory, or returns a dry-run plan by default.
@@ -298,7 +298,7 @@ public static class ComputerRunTools
         [Description("Existing file or directory to delete.")] string path,
         [Description("Allow deletion of directory contents when dry_run is false.")] bool recursive = false,
         [Description("When true, only return the plan; when false, permanently delete the exact path.")] bool dry_run = true)
-        => InvokeFileMutation("delete_path", new { hasPath = !string.IsNullOrWhiteSpace(path), recursive, dry_run }, () => FileSystemService.DeletePath(path, recursive, dry_run));
+        => InvokeFileMutation("delete_path", new { hasPath = !string.IsNullOrWhiteSpace(path), recursive, dry_run }, dry_run, () => FileSystemService.DeletePath(path, recursive, dry_run));
 
     /// <summary>
     /// Reads local Git status without changing the repository.
@@ -318,7 +318,7 @@ public static class ComputerRunTools
         [Description("Repository directory to initialize.")] string repo_path,
         [Description("Create a bare repository instead of a working-tree repository.")] bool bare = false,
         [Description("When true, only return the plan; when false, run git init.")] bool dry_run = true)
-        => InvokeGitMutation("git_init", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path), bare, dry_run }, () => GitService.CreateDefault().Init(repo_path, bare, dry_run));
+        => InvokeGitMutation("git_init", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path), bare, dry_run }, dry_run, () => GitService.CreateDefault().Init(repo_path, bare, dry_run));
 
     /// <summary>
     /// Clones a local or remote Git repository, or returns a dry-run plan by default.
@@ -329,7 +329,7 @@ public static class ComputerRunTools
         [Description("Git URL or local source path.")] string url,
         [Description("New destination directory, which must not already exist.")] string destination,
         [Description("When true, only return the plan; when false, run git clone.")] bool dry_run = true)
-        => InvokeGitMutation("git_clone", new { hasUrl = !string.IsNullOrWhiteSpace(url), hasDestination = !string.IsNullOrWhiteSpace(destination), dry_run }, () => GitService.CreateDefault().Clone(url, destination, dry_run));
+        => InvokeGitMutation("git_clone", new { hasUrl = !string.IsNullOrWhiteSpace(url), hasDestination = !string.IsNullOrWhiteSpace(destination), dry_run }, dry_run, () => GitService.CreateDefault().Clone(url, destination, dry_run));
 
     /// <summary>
     /// Creates a local Git branch, or returns a dry-run plan by default.
@@ -341,7 +341,7 @@ public static class ComputerRunTools
         [Description("Branch name to validate and create.")] string branch,
         [Description("Switch to the new branch after creating it when dry_run is false.")] bool checkout = false,
         [Description("When true, only return the plan; when false, create the branch.")] bool dry_run = true)
-        => InvokeGitMutation("git_create_branch", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path), branchLength = branch?.Length ?? 0, checkout, dry_run }, () => GitService.CreateDefault().CreateBranch(repo_path, branch ?? string.Empty, checkout, dry_run));
+        => InvokeGitMutation("git_create_branch", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path), branchLength = branch?.Length ?? 0, checkout, dry_run }, dry_run, () => GitService.CreateDefault().CreateBranch(repo_path, branch ?? string.Empty, checkout, dry_run));
 
     /// <summary>
     /// Commits local Git changes, or returns a dry-run plan by default.
@@ -353,7 +353,51 @@ public static class ComputerRunTools
         [Description("Non-empty commit message.")] string message,
         [Description("Stage all tracked and untracked changes before committing when dry_run is false.")] bool stage_all = false,
         [Description("When true, only return the current status plan; when false, stage optionally and commit locally.")] bool dry_run = true)
-        => InvokeGitMutation("git_commit", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path), messageLength = message?.Length ?? 0, stage_all, dry_run }, () => GitService.CreateDefault().Commit(repo_path, message ?? string.Empty, stage_all, dry_run));
+        => InvokeGitMutation("git_commit", new { hasRepositoryPath = !string.IsNullOrWhiteSpace(repo_path), messageLength = message?.Length ?? 0, stage_all, dry_run }, dry_run, () => GitService.CreateDefault().Commit(repo_path, message ?? string.Empty, stage_all, dry_run));
+
+    /// <summary>
+    /// Lists processes by optional name without changing process state.
+    /// </summary>
+    [McpServerTool]
+    [Description("List running processes with bounded metadata. An optional process name may include or omit .exe; the query never launches or terminates anything.")]
+    public static string list_processes(
+        [Description("Optional process name, for example msedge or notepad.exe.")] string? process_name = null,
+        [Description("Maximum number of processes to return, from 1 to 1000.")] int limit = 100)
+        => InvokeProcessObservation("list_processes", new { hasProcessFilter = !string.IsNullOrWhiteSpace(process_name), limit }, () => ProcessService.ListProcesses(process_name, limit));
+
+    /// <summary>
+    /// Waits for a process by name or PID using a bounded observation-only loop.
+    /// </summary>
+    [McpServerTool]
+    [Description("Wait for a running process by name or PID. The wait is bounded to 30 seconds and never sends input or changes process state.")]
+    public static string wait_for_process(
+        [Description("Optional process name, with or without .exe.")] string? process_name = null,
+        [Description("Optional process ID. Provide process_name or process_id.")] int? process_id = null,
+        [Description("Maximum wait in milliseconds, from 0 to 30000.")] int timeout_ms = 5000,
+        [Description("Polling interval in milliseconds, from 25 to 1000.")] int poll_ms = 100)
+        => InvokeProcessObservation("wait_for_process", new { hasProcessFilter = !string.IsNullOrWhiteSpace(process_name), process_id, timeout_ms, poll_ms }, () => ProcessService.WaitForProcess(process_name, process_id, timeout_ms, poll_ms));
+
+    /// <summary>
+    /// Starts an executable with an argument list, or returns a dry-run plan by default.
+    /// </summary>
+    [McpServerTool]
+    [Description("Launch an executable with arguments passed without a shell. dry_run defaults to true; when false it starts the application and returns a best-effort PID. For GUI apps that reuse a process, use wait_for_window for the final window identity.")]
+    public static string launch_application(
+        [Description("Executable name or absolute path.")] string executable,
+        [Description("Arguments passed as separate values, never shell-parsed.")] IReadOnlyList<string>? arguments = null,
+        [Description("Optional existing working directory.")] string? working_directory = null,
+        [Description("When true, only return the plan; when false, start the application.")] bool dry_run = true)
+        => InvokeProcessMutation("launch_application", new { executableLength = executable?.Length ?? 0, argumentCount = arguments?.Count ?? 0, hasWorkingDirectory = !string.IsNullOrWhiteSpace(working_directory), dry_run }, dry_run, () => ProcessService.Launch(executable ?? string.Empty, arguments ?? [], working_directory, dry_run));
+
+    /// <summary>
+    /// Opens an HTTP(S) URL through the operating system's default browser, or returns a dry-run plan.
+    /// </summary>
+    [McpServerTool]
+    [Description("Open an absolute http or https URL using the operating system's default browser. dry_run defaults to true and never opens a tab until false is explicitly supplied; any returned PID is best-effort because browsers may reuse an existing process.")]
+    public static string open_url(
+        [Description("Absolute http or https URL.")] string url,
+        [Description("When true, only return the normalized URL plan; when false, open it in the default browser.")] bool dry_run = true)
+        => InvokeProcessMutation("open_url", new { urlLength = url?.Length ?? 0, dry_run }, dry_run, () => ProcessService.OpenUrl(url ?? string.Empty, dry_run));
 
     private static TResult Invoke<TResult>(string tool, object? arguments, Func<IComputerRunService, TResult> action)
     {
@@ -377,11 +421,11 @@ public static class ComputerRunTools
         return ComputerRunAuditLogger.Execute(tool, arguments, action);
     }
 
-    private static TResult InvokeFileMutation<TResult>(string tool, object? arguments, Func<TResult> action)
+    private static TResult InvokeFileMutation<TResult>(string tool, object? arguments, bool dryRun, Func<TResult> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
-        using var control = ComputerRunToolRuntime.BeginDesktopControlInvocation();
+        using var control = dryRun ? null : ComputerRunToolRuntime.BeginDesktopControlInvocation();
         return ComputerRunAuditLogger.Execute(tool, arguments, action);
     }
 
@@ -392,11 +436,26 @@ public static class ComputerRunTools
         return ComputerRunAuditLogger.Execute(tool, arguments, action);
     }
 
-    private static TResult InvokeGitMutation<TResult>(string tool, object? arguments, Func<TResult> action)
+    private static TResult InvokeGitMutation<TResult>(string tool, object? arguments, bool dryRun, Func<TResult> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
-        using var control = ComputerRunToolRuntime.BeginDesktopControlInvocation();
+        using var control = dryRun ? null : ComputerRunToolRuntime.BeginDesktopControlInvocation();
+        return ComputerRunAuditLogger.Execute(tool, arguments, action);
+    }
+
+    private static TResult InvokeProcessObservation<TResult>(string tool, object? arguments, Func<TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        return ComputerRunAuditLogger.Execute(tool, arguments, action);
+    }
+
+    private static TResult InvokeProcessMutation<TResult>(string tool, object? arguments, bool dryRun, Func<TResult> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
+        using var control = dryRun ? null : ComputerRunToolRuntime.BeginDesktopControlInvocation();
         return ComputerRunAuditLogger.Execute(tool, arguments, action);
     }
 

@@ -31,9 +31,9 @@ public class McpIntegrationTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(tools.Length).IsEqualTo(25);
+        await Assert.That(tools.Length).IsEqualTo(29);
         await Assert.That(string.Join("|", tools)).IsEqualTo(
-            "activate_window|click|close_window|copy_path|create_directory|cursor_position|delete_path|find_windows|git_clone|git_commit|git_create_branch|git_init|git_status|hotkey|list_directory|list_windows|move_mouse|move_path|press_key|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_window");
+            "activate_window|click|close_window|copy_path|create_directory|cursor_position|delete_path|find_windows|git_clone|git_commit|git_create_branch|git_init|git_status|hotkey|launch_application|list_directory|list_processes|list_windows|move_mouse|move_path|open_url|press_key|screenshot|screenshot_window|scroll|type_text|verify_window|wait_for_process|wait_for_window");
     }
 
     [Test]
@@ -84,6 +84,10 @@ public class McpIntegrationTests
         _ = ComputerRunTools.git_clone("https://example.test/repo.git", Path.Combine(Path.GetTempPath(), "codex-computer-run-clone-dry-run"), dry_run: true);
         _ = ComputerRunTools.git_create_branch(repositoryRoot, "feature/codex-dry-run", dry_run: true);
         _ = ComputerRunTools.git_commit(repositoryRoot, "dry-run commit", dry_run: true);
+        _ = ComputerRunTools.list_processes(process_name: "dotnet", limit: 1);
+        _ = ComputerRunTools.wait_for_process(process_id: Environment.ProcessId, timeout_ms: 0, poll_ms: 25);
+        _ = ComputerRunTools.launch_application("dotnet", ["--version"], dry_run: true);
+        _ = ComputerRunTools.open_url("https://example.test/", dry_run: true);
 
         await Assert.That(service.Calls).IsEqualTo(15);
     }
