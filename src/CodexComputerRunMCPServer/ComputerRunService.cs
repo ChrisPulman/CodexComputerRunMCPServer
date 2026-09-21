@@ -421,4 +421,23 @@ internal sealed record ScreenshotMetadata(
 /// <param name="ProcessId">Owning process identifier.</param>
 /// <param name="ProcessName">Owning process name, when available.</param>
 /// <param name="Title">Window title text.</param>
-internal sealed record WindowInfo(long Handle, int ProcessId, string? ProcessName, string Title);
+/// <param name="IsForeground">Whether the window is the current foreground window, when the platform reports it.</param>
+/// <param name="IsMinimized">Whether the window is minimized, when the platform reports it.</param>
+/// <param name="Bounds">Window bounds in virtual desktop screen coordinates, when available.</param>
+internal sealed record WindowInfo(
+    long Handle,
+    int ProcessId,
+    string? ProcessName,
+    string Title,
+    bool? IsForeground = null,
+    bool? IsMinimized = null,
+    WindowBounds? Bounds = null);
+
+/// <summary>
+/// Describes a top-level window's screen-space bounds.
+/// </summary>
+/// <param name="Left">Left edge in virtual desktop coordinates.</param>
+/// <param name="Top">Top edge in virtual desktop coordinates.</param>
+/// <param name="Width">Window width in pixels.</param>
+/// <param name="Height">Window height in pixels.</param>
+internal sealed record WindowBounds(int Left, int Top, int Width, int Height);

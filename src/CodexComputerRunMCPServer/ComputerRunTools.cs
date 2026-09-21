@@ -143,7 +143,7 @@ public static class ComputerRunTools
     /// <param name="limit">Maximum number of windows to return.</param>
     /// <returns>A JSON array payload with visible window metadata.</returns>
     [McpServerTool]
-    [Description("List visible top-level desktop windows as JSON.")]
+    [Description("List visible top-level desktop windows as JSON, including process identity, foreground/minimized state, and screen-space bounds when available.")]
     public static string list_windows([Description("Maximum number of windows to return.")] int limit = 50)
         => Invoke(service => service.ListWindows(limit));
 

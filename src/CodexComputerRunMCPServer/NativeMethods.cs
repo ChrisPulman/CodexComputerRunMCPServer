@@ -122,6 +122,33 @@ internal static partial class NativeMethods
     }
 
     /// <summary>
+    /// Represents the screen-space rectangle returned by Win32 for a top-level window.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect
+    {
+        /// <summary>
+        /// Left edge in virtual desktop coordinates.
+        /// </summary>
+        public int Left;
+
+        /// <summary>
+        /// Top edge in virtual desktop coordinates.
+        /// </summary>
+        public int Top;
+
+        /// <summary>
+        /// Right edge in virtual desktop coordinates.
+        /// </summary>
+        public int Right;
+
+        /// <summary>
+        /// Bottom edge in virtual desktop coordinates.
+        /// </summary>
+        public int Bottom;
+    }
+
+    /// <summary>
     /// Represents an input event passed to <see cref="SendInput"/>.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
@@ -418,4 +445,30 @@ internal static partial class NativeMethods
     /// <returns>The identifier of the thread that created the window.</returns>
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    /// <summary>
+    /// Retrieves the handle of the foreground window.
+    /// </summary>
+    /// <returns>The handle of the window receiving user input, or zero when unavailable.</returns>
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    /// <summary>
+    /// Determines whether a window is minimized.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <returns><see langword="true"/> when the window is minimized.</returns>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsIconic(IntPtr hWnd);
+
+    /// <summary>
+    /// Retrieves the screen-space bounding rectangle of a window.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <param name="rect">Receives the window rectangle.</param>
+    /// <returns><see langword="true"/> when the rectangle was retrieved.</returns>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
 }

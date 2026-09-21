@@ -276,6 +276,7 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
     {
         var windows = new List<WindowInfo>(Math.Min(limit, 128));
         var processNames = new Dictionary<int, string?>();
+        var foregroundWindow = NativeMethods.GetForegroundWindow();
 
         NativeMethods.EnumWindows((hWnd, lParam) =>
         {
@@ -311,7 +312,22 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
                 processNames[pid] = processName;
             }
 
-            windows.Add(new WindowInfo(hWnd.ToInt64(), pid, processName, title));
+            var bounds = NativeMethods.GetWindowRect(hWnd, out var rect)
+                ? new WindowBounds(
+                    rect.Left,
+                    rect.Top,
+                    Math.Max(0, rect.Right - rect.Left),
+                    Math.Max(0, rect.Bottom - rect.Top))
+                : null;
+
+            windows.Add(new WindowInfo(
+                hWnd.ToInt64(),
+                pid,
+                processName,
+                title,
+                IsForeground: hWnd == foregroundWindow,
+                IsMinimized: NativeMethods.IsIconic(hWnd),
+                Bounds: bounds));
             return true;
         }, IntPtr.Zero);
 

@@ -145,6 +145,10 @@ public class ComputerRunServiceTests
         await Assert.That(cursor.GetProperty("y").GetInt32()).IsEqualTo(456);
         await Assert.That(windows.GetArrayLength()).IsEqualTo(1);
         await Assert.That(windows[0].GetProperty("title").GetString()).IsEqualTo("Untitled - Notepad");
+        await Assert.That(windows[0].GetProperty("isForeground").GetBoolean()).IsTrue();
+        await Assert.That(windows[0].GetProperty("isMinimized").GetBoolean()).IsFalse();
+        await Assert.That(windows[0].GetProperty("bounds").GetProperty("width").GetInt32()).IsEqualTo(640);
+        await Assert.That(windows[0].GetProperty("bounds").GetProperty("height").GetInt32()).IsEqualTo(480);
     }
 
     [Test]

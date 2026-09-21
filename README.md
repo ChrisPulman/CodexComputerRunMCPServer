@@ -213,6 +213,8 @@ Lists visible top-level desktop windows as JSON.
 
 **When to use:** Use to identify visible applications and window titles before interacting with the desktop.
 
+Each window entry also includes `isForeground`, `isMinimized`, and `bounds` when the platform can provide them. `bounds` contains `left`, `top`, `width`, and `height` in virtual-desktop screen coordinates. Use these fields to confirm the intended process and target window before relying on coordinates; a title match alone is not sufficient when multiple windows are open.
+
 ## Performance And Integration Notes
 
 - Screenshot capture avoids temporary files when `path` is omitted.

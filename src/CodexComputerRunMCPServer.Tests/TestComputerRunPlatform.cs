@@ -30,8 +30,8 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public List<WindowInfo> Windows { get; } =
     [
-        new(100, 200, "notepad", "Untitled - Notepad"),
-        new(101, 201, "explorer", "Downloads"),
+        new(100, 200, "notepad", "Untitled - Notepad", true, false, new WindowBounds(10, 20, 640, 480)),
+        new(101, 201, "explorer", "Downloads", false, true, new WindowBounds(0, 0, 1024, 768)),
     ];
 
     public Dictionary<char, short> KeyScans { get; } = new()
