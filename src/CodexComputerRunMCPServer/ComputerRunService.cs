@@ -90,6 +90,16 @@ internal interface IComputerRunService
     string ListWindows(int limit);
 
     /// <summary>
+    /// Finds visible windows by optional process, title, foreground, and minimized-state filters.
+    /// </summary>
+    string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit);
+
+    /// <summary>
+    /// Captures the screen-space bounds of a previously enumerated window handle.
+    /// </summary>
+    CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage);
+
+    /// <summary>
     /// Brings a previously enumerated top-level window to the foreground.
     /// </summary>
     /// <param name="handle">Native window handle returned by <see cref="ListWindows"/>.</param>
@@ -244,6 +254,61 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
+    public string FindWindows(
+        string? processName,
+        string? titleContains,
+        bool foregroundOnly,
+        bool includeMinimized,
+        int limit)
+    {
+        ValidateWindowLimit(limit);
+
+        var normalizedProcess = NormalizeFilter(processName);
+        var normalizedTitle = NormalizeFilter(titleContains);
+        var windows = platform
+            .ListWindows(WindowEnumerationLimit)
+            .Where(window => normalizedProcess is null
+                || string.Equals(window.ProcessName, normalizedProcess, StringComparison.OrdinalIgnoreCase))
+            .Where(window => normalizedTitle is null
+                || window.Title.Contains(normalizedTitle, StringComparison.OrdinalIgnoreCase))
+            .Where(window => !foregroundOnly || window.IsForeground == true)
+            .Where(window => includeMinimized || window.IsMinimized != true)
+            .Take(limit)
+            .ToArray();
+
+        return JsonSerializer.Serialize(windows, JsonOptions);
+    }
+
+    /// <inheritdoc />
+    public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage)
+    {
+        if (handle <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "handle must be a positive native window handle.");
+        }
+
+        var window = platform
+            .ListWindows(WindowEnumerationLimit)
+            .FirstOrDefault(candidate => candidate.Handle == handle);
+
+        if (window is null)
+        {
+            throw new ArgumentException(
+                $"Window handle {handle} was not found among visible top-level windows. Call list_windows or find_windows again.",
+                nameof(handle));
+        }
+
+        if (window.Bounds is null)
+        {
+            throw new PlatformNotSupportedException(
+                $"The current platform did not provide screen bounds for window handle {handle}.");
+        }
+
+        var bounds = new Rectangle(window.Bounds.Left, window.Bounds.Top, window.Bounds.Width, window.Bounds.Height);
+        return Screenshot(path, includeImage, bounds);
+    }
+
+    /// <inheritdoc />
     public string ActivateWindow(long handle, bool restore)
     {
         if (handle <= 0)
@@ -297,6 +362,19 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
             throw new ArgumentOutOfRangeException(nameof(region), "Screenshot height must be greater than zero.");
         }
     }
+
+    private static void ValidateWindowLimit(int limit)
+    {
+        if (limit < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit), "limit must be at least 1.");
+        }
+    }
+
+    private static string? NormalizeFilter(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private const int WindowEnumerationLimit = 256;
 
     /// <summary>
     /// Creates a user-facing status message for screenshot operations.

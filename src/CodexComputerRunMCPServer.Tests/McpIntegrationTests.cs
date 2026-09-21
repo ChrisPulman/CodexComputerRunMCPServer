@@ -31,9 +31,9 @@ public class McpIntegrationTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        await Assert.That(tools.Length).IsEqualTo(10);
+        await Assert.That(tools.Length).IsEqualTo(12);
         await Assert.That(string.Join("|", tools)).IsEqualTo(
-            "activate_window|click|cursor_position|hotkey|list_windows|move_mouse|press_key|screenshot|scroll|type_text");
+            "activate_window|click|cursor_position|find_windows|hotkey|list_windows|move_mouse|press_key|screenshot|screenshot_window|scroll|type_text");
     }
 
     [Test]
@@ -66,10 +66,12 @@ public class McpIntegrationTests
         _ = ComputerRunTools.type_text("abc");
         _ = ComputerRunTools.cursor_position();
         _ = ComputerRunTools.list_windows();
+        _ = ComputerRunTools.find_windows(process_name: "notepad", title_contains: "untitled", foreground_only: false, include_minimized: true, limit: 10);
         _ = ComputerRunTools.activate_window(100, restore: false);
         _ = ComputerRunTools.screenshot(include_image: false);
+        _ = ComputerRunTools.screenshot_window(100, include_image: false);
 
-        await Assert.That(service.Calls).IsEqualTo(10);
+        await Assert.That(service.Calls).IsEqualTo(12);
     }
 
     [Test]
@@ -175,6 +177,18 @@ public class McpIntegrationTests
         {
             Calls++;
             return "[]";
+        }
+
+        public string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit)
+        {
+            Calls++;
+            return "[]";
+        }
+
+        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage)
+        {
+            Calls++;
+            return new CallToolResult { Content = [] };
         }
 
         public string ActivateWindow(long handle, bool restore)

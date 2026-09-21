@@ -191,6 +191,11 @@ public class ComputerRunLifecycleTests
 
         public string ListWindows(int limit) => throw new NotSupportedException();
 
+        public string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit)
+            => throw new NotSupportedException();
+
+        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage) => throw new NotSupportedException();
+
         public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
     }
 
@@ -226,6 +231,11 @@ public class ComputerRunLifecycleTests
         public string TypeText(string text, double? delay) => throw new NotSupportedException();
 
         public string ListWindows(int limit) => throw new NotSupportedException();
+
+        public string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit)
+            => throw new NotSupportedException();
+
+        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage) => throw new NotSupportedException();
 
         public string ActivateWindow(long handle, bool restore) => throw new NotSupportedException();
     }

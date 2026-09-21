@@ -153,6 +153,30 @@ public static class ComputerRunTools
         => Invoke(service => service.ListWindows(limit));
 
     /// <summary>
+    /// Finds visible windows using stable metadata instead of screen coordinates.
+    /// </summary>
+    [McpServerTool]
+    [Description("Find visible top-level windows by optional process name, title substring, foreground state, or minimized state.")]
+    public static string find_windows(
+        [Description("Optional process name, matched case-insensitively, for example Notepad or msedge.")] string? process_name = null,
+        [Description("Optional case-insensitive substring of the window title.")] string? title_contains = null,
+        [Description("Return only windows reported as the current foreground window.")] bool foreground_only = false,
+        [Description("Include minimized windows in the results.")] bool include_minimized = true,
+        [Description("Maximum number of matching windows to return.")] int limit = 50)
+        => Invoke(service => service.FindWindows(process_name, title_contains, foreground_only, include_minimized, limit));
+
+    /// <summary>
+    /// Captures a window's screen-space bounds by native handle.
+    /// </summary>
+    [McpServerTool]
+    [Description("Capture a visible top-level window by native handle returned by list_windows or find_windows. The capture is screen-space and does not reveal occluded content.")]
+    public static CallToolResult screenshot_window(
+        [Description("Native window handle returned by list_windows or find_windows.")] long handle,
+        [Description("Optional output PNG path. If omitted, no file is created.")] string? path = null,
+        [Description("Include PNG image data in the MCP tool result.")] bool include_image = true)
+        => Invoke(service => service.ScreenshotWindow(handle, path, include_image));
+
+    /// <summary>
     /// Brings a window returned by <see cref="list_windows"/> to the foreground.
     /// </summary>
     /// <param name="handle">Native window handle returned by list_windows.</param>

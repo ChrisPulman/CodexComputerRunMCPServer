@@ -3,7 +3,7 @@
 <!-- mcp-name: io.github.chrispulman/codex-computer-run-mcp-server -->
 
 Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct control over a signed-in desktop session.
-It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode paste, cursor position, and visible window discovery, plus a bundled Codex Skill for safe desktop-use workflows.
+It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode text entry, cursor position, and metadata-based window targeting, plus a bundled Codex Skill for safe desktop-use workflows.
 
 It is implemented in C# on `net10.0` using `ModelContextProtocol` `1.3.0`.
 The current package and MCP manifest version is `1.1.0`.
@@ -220,6 +220,34 @@ Each window entry also includes `isForeground`, `isMinimized`, and `bounds` when
 
 ---
 
+### `find_windows`
+
+Finds visible top-level windows by optional process name, title substring, foreground state, and minimized state. Matching is case-insensitive for process names and title text.
+
+**Parameters:**
+- `process_name` *(optional)* - process name such as `Notepad` or `msedge`.
+- `title_contains` *(optional)* - case-insensitive substring of the window title.
+- `foreground_only` *(optional)* - return only windows reported as foreground.
+- `include_minimized` *(optional)* - include minimized windows; defaults to `true`.
+- `limit` *(optional)* - maximum number of matches; defaults to 50.
+
+**When to use:** Prefer this when several windows are open and a process/title predicate is more reliable than choosing by screen coordinates. Re-check the returned handle immediately before a data-bearing action because window handles can become stale.
+
+---
+
+### `screenshot_window`
+
+Captures the screen-space bounds of a visible window selected by native handle. It uses the bounds returned by `list_windows` or `find_windows`; it does not reveal pixels hidden behind another window.
+
+**Parameters:**
+- `handle` - native window handle returned by `list_windows` or `find_windows`.
+- `path` *(optional)* - output PNG path.
+- `include_image` *(optional)* - include PNG bytes in the MCP result; defaults to `true`.
+
+**When to use:** Use after targeting a window when the agent needs a focused visual observation or wants to avoid capturing the entire multi-monitor desktop.
+
+---
+
 ### `activate_window`
 
 Brings a previously enumerated window to the foreground by its native handle.
@@ -236,7 +264,7 @@ Brings a previously enumerated window to the foreground by its native handle.
 - `include_image:false` avoids PNG encoding unless a `path` is supplied.
 - Windows mouse and keyboard actions use batched `SendInput` calls instead of legacy per-event APIs.
 - Windows `hotkey` presses all keys down and releases them in reverse order in one batch.
-- Windows clipboard access retries briefly when another process has the clipboard open.
+- Windows text entry emits direct Unicode input and leaves the clipboard unchanged.
 - Windows visible window enumeration caches process names by PID during each call.
 - Startup enables per-monitor DPI awareness on Windows for correct coordinate and screenshot behavior on mixed-DPI displays.
 - Linux and macOS adapters fail with actionable dependency messages when required desktop commands are missing.
@@ -455,10 +483,10 @@ dotnet publish .\src\CodexComputerRunMCPServer\CodexComputerRunMCPServer.csproj 
 
 ## MCP Verification
 
-The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 10 tools:
+The TUnit suite verifies MCP metadata, the bundled Codex Skill, platform adapters, lifecycle behavior, and the static tool facade. The published `win-x64` executable was also validated with an MCP stdio `initialize` and `tools/list` handshake. The server reports all 12 tools:
 
 ```text
-activate_window, scroll, hotkey, type_text, screenshot, list_windows, click, move_mouse, press_key, cursor_position
+activate_window, scroll, hotkey, type_text, screenshot, list_windows, find_windows, screenshot_window, click, move_mouse, press_key, cursor_position
 ```
 
 Live Linux and macOS desktop behavior depends on the active graphical session, installed command dependencies, and OS-level permissions.
@@ -468,10 +496,11 @@ Live Linux and macOS desktop behavior depends on the active graphical session, i
 Once configured, you can ask things like:
 
 - "Call `screenshot` and describe the active window."
+- "Call `find_windows` for `msedge` with a title containing `Discord`, activate the returned handle, then call `screenshot_window`."
 - "List visible windows and tell me which browser tabs or apps are available."
 - "Move the mouse to `x=400`, `y=300`, click, then take another screenshot."
 - "Press `ctrl+l`, type `https://example.com`, then press `enter`."
-- "Paste this text into the focused editor using `type_text`."
+- "Enter this text into the focused editor using `type_text`."
 - "Scroll down 5 notches and confirm what changed on screen."
 - "Get the cursor position before clicking."
 

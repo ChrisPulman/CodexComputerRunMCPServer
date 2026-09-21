@@ -187,6 +187,48 @@ public class ComputerRunServiceTests
     }
 
     [Test]
+    public async Task FindWindows_FiltersByProcessTitleAndState()
+    {
+        var service = new ComputerRunService(new TestComputerRunPlatform());
+
+        var windows = JsonDocument.Parse(service.FindWindows("NOTEPAD", "untitled", foregroundOnly: true, includeMinimized: false, limit: 10)).RootElement;
+
+        await Assert.That(windows.GetArrayLength()).IsEqualTo(1);
+        await Assert.That(windows[0].GetProperty("handle").GetInt64()).IsEqualTo(100);
+    }
+
+    [Test]
+    public async Task FindWindows_RejectsInvalidLimit()
+    {
+        var service = new ComputerRunService(new TestComputerRunPlatform());
+
+        await Assert.That(() => service.FindWindows(null, null, false, true, 0))
+            .Throws<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
+    public async Task ScreenshotWindow_UsesWindowBounds()
+    {
+        var platform = new TestComputerRunPlatform();
+        var service = new ComputerRunService(platform);
+
+        var result = service.ScreenshotWindow(100, path: null, includeImage: true);
+
+        await Assert.That(platform.Captures.Single()).IsEqualTo(new Rectangle(10, 20, 640, 480));
+        await Assert.That(ReadMetadata(result).GetProperty("width").GetInt32()).IsEqualTo(640);
+        await Assert.That(ReadMetadata(result).GetProperty("height").GetInt32()).IsEqualTo(480);
+    }
+
+    [Test]
+    public async Task ScreenshotWindow_RejectsUnknownHandle()
+    {
+        var service = new ComputerRunService(new TestComputerRunPlatform());
+
+        await Assert.That(() => service.ScreenshotWindow(999, path: null, includeImage: false))
+            .Throws<ArgumentException>();
+    }
+
+    [Test]
     public async Task ActivateWindow_DelegatesHandleAndRestoreFlag()
     {
         var platform = new TestComputerRunPlatform();

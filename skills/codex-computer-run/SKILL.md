@@ -1,6 +1,6 @@
 ---
 name: codex-computer-run
-description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, visible window discovery, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text paste into focused applications.
+description: Use this skill when Codex needs to operate or inspect a signed-in desktop through the Codex Computer Run MCP server, including screenshots, metadata-based window targeting, visible window discovery, cursor position checks, mouse movement, clicking, scrolling, keyboard shortcuts, single-key presses, or Unicode text entry into focused applications.
 ---
 
 # Codex Computer Run
@@ -25,7 +25,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 
 - Prefer the `mcp__codex_computer_run__` namespace when available.
 - If tools are deferred, search for `ComputerRun`, `codex computer run`, or `desktop screenshot mouse keyboard` and choose the namespace that exposes the complete tool set.
-- Expect these tools: `screenshot`, `list_windows`, `activate_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`.
+- Expect these tools: `screenshot`, `list_windows`, `find_windows`, `screenshot_window`, `activate_window`, `cursor_position`, `move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text`.
 - If the MCP tools are unavailable, state that the Computer Run server is not configured in the current session instead of simulating desktop interaction with unrelated shell commands.
 
 ## Platform Notes
@@ -37,9 +37,9 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 ## Operating Protocol
 
 1. Observe before acting:
-   - Use `list_windows` to identify visible applications and likely targets.
+   - Use `list_windows` or `find_windows` to identify visible applications and likely targets.
    - Use `activate_window` with a handle returned by `list_windows` when the intended target is not already foreground.
-   - Use `screenshot` when visual layout, coordinates, or UI state matters.
+   - Use `screenshot_window` when a target handle and bounds are known; use full `screenshot` when the wider desktop context matters.
    - Use `cursor_position` before relying on the current pointer location.
 2. Plan in absolute desktop coordinates:
    - Treat coordinates as desktop coordinates, not browser or app-relative coordinates.
