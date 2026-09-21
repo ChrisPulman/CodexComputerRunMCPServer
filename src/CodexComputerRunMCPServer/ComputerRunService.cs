@@ -18,7 +18,7 @@ internal interface IComputerRunService
     /// <see langword="true"/> to include the PNG bytes in the tool response; otherwise metadata only.
     /// </param>
     /// <returns>A tool result containing serialized screenshot metadata and optional image content.</returns>
-    CallToolResult Screenshot(string? path, bool includeImage);
+    CallToolResult Screenshot(string? path, bool includeImage, Rectangle? region = null);
 
     /// <summary>
     /// Moves the cursor to the specified desktop coordinates.
@@ -105,9 +105,10 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     public static IComputerRunService CreateDefault() => new ComputerRunService(ComputerRunPlatformFactory.CreateDefault());
 
     /// <inheritdoc />
-    public CallToolResult Screenshot(string? path, bool includeImage)
+    public CallToolResult Screenshot(string? path, bool includeImage, Rectangle? region = null)
     {
-        var bounds = platform.GetVirtualScreenBounds();
+        var bounds = region ?? platform.GetVirtualScreenBounds();
+        ValidateScreenshotRegion(bounds);
         var screenshotPath = ResolveOptionalPath(path);
         byte[]? imageBytes = null;
 
@@ -257,6 +258,24 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
         }
 
         return fullPath;
+    }
+
+    /// <summary>
+    /// Validates a requested screenshot region before passing it to a platform adapter.
+    /// </summary>
+    /// <param name="region">The region to validate.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the region has no area.</exception>
+    private static void ValidateScreenshotRegion(Rectangle region)
+    {
+        if (region.Width <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(region), "Screenshot width must be greater than zero.");
+        }
+
+        if (region.Height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(region), "Screenshot height must be greater than zero.");
+        }
     }
 
     /// <summary>

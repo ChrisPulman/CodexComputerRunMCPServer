@@ -174,7 +174,7 @@ public class ComputerRunLifecycleTests
             return "{}";
         }
 
-        public CallToolResult Screenshot(string? path, bool includeImage) => throw new NotSupportedException();
+        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region) => throw new NotSupportedException();
 
         public string MoveMouse(int x, int y, double? delay) => throw new NotSupportedException();
 
@@ -210,7 +210,7 @@ public class ComputerRunLifecycleTests
             return "move";
         }
 
-        public CallToolResult Screenshot(string? path, bool includeImage) => throw new NotSupportedException();
+        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region) => throw new NotSupportedException();
 
         public string Click(int? x, int? y, string button, int clicks, double interval, double? delay)
             => throw new NotSupportedException();

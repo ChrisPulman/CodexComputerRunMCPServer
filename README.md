@@ -109,8 +109,11 @@ Captures the current desktop as PNG.
 **Parameters:**
 - `path` *(optional)* - output PNG path. If omitted, the image is returned in memory and no temporary file is created.
 - `include_image` *(default: `true`)* - include PNG image data in the MCP tool result.
+- `left`, `top`, `width`, `height` *(optional)* - capture only a screen-space region. Provide all four values together; `width` and `height` must be greater than zero.
 
 **Response:** The first content block is JSON metadata with `message`, `path`, `mimeType`, `platform`, `left`, `top`, `width`, and `height`. When `include_image` is `true`, a PNG image block is also returned.
+
+When a region is supplied, the metadata bounds describe that region instead of the full virtual desktop. Region coordinates use the same virtual-desktop screen space as window bounds returned by `list_windows`.
 
 **When to use:** Use before interacting with the desktop, after UI changes, or when the agent needs visual confirmation.
 

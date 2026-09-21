@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Drawing;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -28,11 +29,15 @@ public static class ComputerRunTools
     /// A <see cref="CallToolResult"/> containing the screenshot result payload.
     /// </returns>
     [McpServerTool]
-    [Description("Capture the current desktop as a PNG. Pass path to save it on disk; omit path for an in-memory MCP image result.")]
+    [Description("Capture the current desktop or a requested screen region as a PNG. Pass path to save it on disk; omit path for an in-memory MCP image result.")]
     public static CallToolResult screenshot(
         [Description("Optional output PNG path. If omitted, no temporary file is created.")] string? path = null,
-        [Description("Include PNG image data in the MCP tool result.")] bool include_image = true)
-        => Invoke(service => service.Screenshot(path, include_image));
+        [Description("Include PNG image data in the MCP tool result.")] bool include_image = true,
+        [Description("Optional left edge of a screen-space capture region. Provide all four region values together.")] int? left = null,
+        [Description("Optional top edge of a screen-space capture region. Provide all four region values together.")] int? top = null,
+        [Description("Optional width of a screen-space capture region. Must be greater than zero.")] int? width = null,
+        [Description("Optional height of a screen-space capture region. Must be greater than zero.")] int? height = null)
+        => Invoke(service => service.Screenshot(path, include_image, CreateScreenshotRegion(left, top, width, height)));
 
     /// <summary>
     /// Moves the mouse cursor to absolute desktop coordinates.
@@ -160,5 +165,18 @@ public static class ComputerRunTools
         using var invocation = ComputerRunToolRuntime.BeginToolInvocation();
         using var control = ComputerRunToolRuntime.BeginDesktopControlInvocation();
         return action(ComputerRunToolRuntime.Service);
+    }
+
+    private static Rectangle? CreateScreenshotRegion(int? left, int? top, int? width, int? height)
+    {
+        var values = new[] { left, top, width, height };
+        if (values.Any(value => value.HasValue) && values.Any(value => !value.HasValue))
+        {
+            throw new ArgumentException("left, top, width, and height must be supplied together.");
+        }
+
+        return left.HasValue
+            ? new Rectangle(left.Value, top!.Value, width!.Value, height!.Value)
+            : null;
     }
 }

@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 
@@ -23,6 +24,32 @@ public class ComputerRunServiceTests
         await Assert.That(metadata.GetProperty("platform").GetString()).IsEqualTo("Test");
         await Assert.That(metadata.GetProperty("width").GetInt32()).IsEqualTo(640);
         await Assert.That(metadata.GetProperty("height").GetInt32()).IsEqualTo(480);
+    }
+
+    [Test]
+    public async Task Screenshot_WithRegion_UsesRequestedBounds()
+    {
+        var platform = new TestComputerRunPlatform();
+        var service = new ComputerRunService(platform);
+        var region = new Rectangle(-20, 30, 320, 200);
+
+        var result = service.Screenshot(path: null, includeImage: true, region);
+
+        await Assert.That(platform.Captures.Single()).IsEqualTo(region);
+        var metadata = ReadMetadata(result);
+        await Assert.That(metadata.GetProperty("left").GetInt32()).IsEqualTo(-20);
+        await Assert.That(metadata.GetProperty("top").GetInt32()).IsEqualTo(30);
+        await Assert.That(metadata.GetProperty("width").GetInt32()).IsEqualTo(320);
+        await Assert.That(metadata.GetProperty("height").GetInt32()).IsEqualTo(200);
+    }
+
+    [Test]
+    public async Task Screenshot_RejectsEmptyRegion()
+    {
+        var service = new ComputerRunService(new TestComputerRunPlatform());
+
+        await Assert.That(() => service.Screenshot(null, includeImage: false, new Rectangle(0, 0, 0, 100)))
+            .Throws<ArgumentOutOfRangeException>();
     }
 
     [Test]

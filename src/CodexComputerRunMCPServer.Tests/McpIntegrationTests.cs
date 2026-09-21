@@ -122,7 +122,7 @@ public class McpIntegrationTests
     {
         public int Calls { get; private set; }
 
-        public CallToolResult Screenshot(string? path, bool includeImage)
+        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region)
         {
             Calls++;
             return new CallToolResult { Content = [] };
