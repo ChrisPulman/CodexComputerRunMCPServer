@@ -71,7 +71,7 @@ internal interface IComputerRunService
     /// <summary>
     /// Enters text into the focused application using the platform's preferred text-entry path.
     /// </summary>
-    /// <param name="text">Text to paste. <see langword="null"/> is treated as an empty string.</param>
+    /// <param name="text">Text to enter. <see langword="null"/> is treated as an empty string.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message with entered character count.</returns>
     string TypeText(string text, double? delay);
@@ -486,7 +486,7 @@ internal interface IComputerRunPlatform
     /// <summary>
     /// Enters text into the focused application using the platform's preferred text-entry path.
     /// </summary>
-    /// <param name="text">Text to paste.</param>
+    /// <param name="text">Text to enter.</param>
     void TypeText(string text);
 
     /// <summary>

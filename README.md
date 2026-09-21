@@ -47,7 +47,7 @@ Windows remains the primary implementation. Linux and macOS support keeps the sa
 | Version | `1.1.0` |
 | Target framework | `net10.0` |
 | Windows | Native Win32 implementation with virtual-screen capture, direct Unicode `SendInput`, cursor position, and visible top-level window enumeration |
-| Linux | Command-backed adapter using `xdotool` for pointer and keyboard input, `xrandr` for display-geometry fallback, `wmctrl` or `xdotool` for windows, screenshot command fallbacks, and clipboard command fallbacks |
+| Linux | Command-backed adapter using `xdotool` for pointer and keyboard input, `xrandr` for display-geometry fallback, `wmctrl` or `xdotool` for windows, screenshot command fallbacks, and text-entry command fallbacks |
 | macOS | Command-backed adapter using `screencapture`, `pbcopy`, `osascript`, and `cliclick`; macOS middle-click automation is not supported by the built-in adapter |
 | Unsupported OS | Deterministic unsupported-platform errors instead of silent no-ops |
 | Session requirement | Signed-in interactive desktop session |
@@ -192,7 +192,7 @@ Presses a keyboard shortcut.
 Enters Unicode text into the focused application. On Windows it emits Unicode keyboard events directly and does not modify the clipboard; other platforms use their available native fallback.
 
 **Parameters:**
-- `text` - text to paste.
+- `text` - text to enter.
 - `delay` *(optional)* - seconds to wait after the action.
 
 **When to use:** Use for text fields, editors, terminals, and any non-trivial text entry.
@@ -315,6 +315,12 @@ Optional environment overrides:
 | `CODEX_COMPUTER_RUN_IDLE_SHUTDOWN` | `false` | Set `true` to enable idle shutdown. |
 | `CODEX_COMPUTER_RUN_IDLE_TIMEOUT_SECONDS` | `300` | Seconds without tool activity before shutdown when idle shutdown is enabled. Values `0` or lower disable idle shutdown. |
 | `CODEX_COMPUTER_RUN_IDLE_CHECK_INTERVAL_SECONDS` | `10` | Seconds between idle checks. |
+
+### JSONL Action Audit
+
+Auditing is opt-in because desktop actions can involve private applications. Set `CODEX_COMPUTER_RUN_AUDIT=true` to append one JSON object per tool call. The default file is `%LOCALAPPDATA%\CodexComputerRunMCPServer\actions.jsonl` on Windows, or the current platform's local application-data directory. Override it with `CODEX_COMPUTER_RUN_AUDIT_PATH`.
+
+Records include the UTC timestamp, tool name, safe argument metadata, duration, process ID, success state, and a summarized error when a call fails. Text content, screenshot bytes, and full filter values are intentionally omitted; `type_text` records only the character count. Audit write failures are ignored so a diagnostic log cannot break a desktop action or corrupt MCP stdout.
 
 ### Fast Codex Desktop Configuration
 
