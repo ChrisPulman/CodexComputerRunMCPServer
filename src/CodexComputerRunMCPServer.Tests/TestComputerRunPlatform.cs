@@ -26,6 +26,8 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public List<Rectangle> Captures { get; } = [];
 
+    public List<bool> CursorHighlights { get; } = [];
+
     public List<(Rectangle Bounds, string Path)> SavedScreenshots { get; } = [];
 
     public List<(long Handle, bool Restore)> ActivatedWindows { get; } = [];
@@ -52,15 +54,17 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public Rectangle GetVirtualScreenBounds() => Bounds;
 
-    public byte[] CapturePng(Rectangle bounds)
+    public byte[] CapturePng(Rectangle bounds, bool highlightCursor)
     {
         Captures.Add(bounds);
+        CursorHighlights.Add(highlightCursor);
         return PngBytes;
     }
 
-    public void SaveScreenshotPng(Rectangle bounds, string path)
+    public void SaveScreenshotPng(Rectangle bounds, string path, bool highlightCursor)
     {
         SavedScreenshots.Add((bounds, path));
+        CursorHighlights.Add(highlightCursor);
         File.WriteAllBytes(path, PngBytes);
     }
 

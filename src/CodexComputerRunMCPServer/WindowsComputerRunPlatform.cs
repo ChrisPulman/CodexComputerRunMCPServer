@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -49,11 +50,12 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
     /// Captures a region of the desktop and returns PNG bytes.
     /// </summary>
     /// <param name="bounds">The screen region to capture, in virtual desktop coordinates.</param>
+    /// <param name="highlightCursor">Whether to draw a red halo around the live cursor position.</param>
     /// <returns>A byte array containing PNG-encoded image data.</returns>
-    public byte[] CapturePng(Rectangle bounds)
+    public byte[] CapturePng(Rectangle bounds, bool highlightCursor = true)
     {
         using var stream = new MemoryStream(capacity: Math.Max(4096, bounds.Width * bounds.Height / 8));
-        CapturePng(bounds, stream);
+        CapturePng(bounds, stream, highlightCursor);
         return stream.ToArray();
     }
 
@@ -62,10 +64,11 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
     /// </summary>
     /// <param name="bounds">The screen region to capture, in virtual desktop coordinates.</param>
     /// <param name="path">The output file path for the PNG image.</param>
-    public void SaveScreenshotPng(Rectangle bounds, string path)
+    /// <param name="highlightCursor">Whether to draw a red halo around the live cursor position.</param>
+    public void SaveScreenshotPng(Rectangle bounds, string path, bool highlightCursor = true)
     {
         using var stream = File.Create(path);
-        CapturePng(bounds, stream);
+        CapturePng(bounds, stream, highlightCursor);
     }
 
     /// <summary>
@@ -348,18 +351,51 @@ internal sealed class WindowsComputerRunPlatform : IComputerRunPlatform
     /// </summary>
     /// <param name="bounds">The screen region to capture.</param>
     /// <param name="output">The destination stream for PNG data.</param>
-    private static void CapturePng(Rectangle bounds, Stream output)
+    private static void CapturePng(Rectangle bounds, Stream output, bool highlightCursor)
     {
 #pragma warning disable CA1416 // Runtime entrypoints guard Windows-only calls before this platform implementation is used.
         using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
         using (var graphics = Graphics.FromImage(bitmap))
         {
             graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
+            if (highlightCursor)
+            {
+                DrawCursorHighlight(graphics, bounds);
+            }
         }
 
         bitmap.Save(output, ImageFormat.Png);
 #pragma warning restore CA1416
     }
+
+#pragma warning disable CA1416 // System.Drawing is supported on this Windows-only platform implementation.
+    private static void DrawCursorHighlight(Graphics graphics, Rectangle bounds)
+    {
+        if (!NativeMethods.GetCursorPos(out var point))
+        {
+            ThrowLastWin32Error("GetCursorPos failed while highlighting screenshot cursor");
+        }
+
+        DrawCursorHighlight(graphics, bounds, new Point(point.X, point.Y));
+    }
+
+    internal static void DrawCursorHighlight(Graphics graphics, Rectangle bounds, Point cursor)
+    {
+        var x = cursor.X - bounds.Left;
+        var y = cursor.Y - bounds.Top;
+        const float radius = 14;
+        if (x < -radius || y < -radius || x >= bounds.Width + radius || y >= bounds.Height + radius)
+        {
+            return;
+        }
+
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        using var shadow = new SolidBrush(Color.FromArgb(70, 255, 0, 0));
+        using var outline = new Pen(Color.FromArgb(240, 220, 0, 0), 3);
+        graphics.FillEllipse(shadow, x - radius, y - radius, radius * 2, radius * 2);
+        graphics.DrawEllipse(outline, x - radius, y - radius, radius * 2, radius * 2);
+    }
+#pragma warning restore CA1416
 
     /// <summary>
     /// Creates input events for pressing all keys in order, then releasing them in reverse order.

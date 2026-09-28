@@ -19,7 +19,7 @@ internal interface IComputerRunService
     /// <see langword="true"/> to include the PNG bytes in the tool response; otherwise metadata only.
     /// </param>
     /// <returns>A tool result containing serialized screenshot metadata and optional image content.</returns>
-    CallToolResult Screenshot(string? path, bool includeImage, Rectangle? region = null);
+    CallToolResult Screenshot(string? path, bool includeImage, Rectangle? region = null, bool highlightCursor = true);
 
     /// <summary>
     /// Moves the cursor to the specified desktop coordinates.
@@ -28,7 +28,7 @@ internal interface IComputerRunService
     /// <param name="y">The absolute Y coordinate in virtual desktop space.</param>
     /// <param name="delay">Optional delay in seconds to wait after the operation.</param>
     /// <returns>A human-readable operation result message.</returns>
-    string MoveMouse(int x, int y, double? delay, long? targetHandle);
+    string MoveMouse(int x, int y, double? delay, long? targetHandle, int durationMilliseconds = 350);
 
     /// <summary>
     /// Performs one or more mouse clicks using the specified button, optionally moving first.
@@ -98,7 +98,7 @@ internal interface IComputerRunService
     /// <summary>
     /// Captures the screen-space bounds of a previously enumerated window handle.
     /// </summary>
-    CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage);
+    CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage, bool highlightCursor = true);
 
     /// <summary>
     /// Verifies that a native window still matches the requested targeting predicates.
@@ -139,7 +139,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     public static IComputerRunService CreateDefault() => new ComputerRunService(ComputerRunPlatformFactory.CreateDefault());
 
     /// <inheritdoc />
-    public CallToolResult Screenshot(string? path, bool includeImage, Rectangle? region = null)
+    public CallToolResult Screenshot(string? path, bool includeImage, Rectangle? region = null, bool highlightCursor = true)
     {
         var bounds = region ?? platform.GetVirtualScreenBounds();
         ValidateScreenshotRegion(bounds);
@@ -148,7 +148,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
 
         if (includeImage)
         {
-            imageBytes = platform.CapturePng(bounds);
+            imageBytes = platform.CapturePng(bounds, highlightCursor);
             if (screenshotPath is not null)
             {
                 File.WriteAllBytes(screenshotPath, imageBytes);
@@ -156,7 +156,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
         }
         else if (screenshotPath is not null)
         {
-            platform.SaveScreenshotPng(bounds, screenshotPath);
+            platform.SaveScreenshotPng(bounds, screenshotPath, highlightCursor);
         }
 
         var metadata = new ScreenshotMetadata(
@@ -183,12 +183,47 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public string MoveMouse(int x, int y, double? delay, long? targetHandle)
+    public string MoveMouse(int x, int y, double? delay, long? targetHandle, int durationMilliseconds = 350)
     {
+        if (durationMilliseconds is < 0 or > 10_000)
+        {
+            throw new ArgumentOutOfRangeException(nameof(durationMilliseconds), "duration_ms must be between 0 and 10000.");
+        }
+
         EnsureInputTarget(targetHandle, requireForeground: false);
-        platform.MoveCursor(x, y);
+        if (durationMilliseconds == 0)
+        {
+            platform.MoveCursor(x, y);
+        }
+        else
+        {
+            var start = platform.GetCursorPosition();
+            if (start.X == x && start.Y == y)
+            {
+                platform.MoveCursor(x, y);
+            }
+            else
+            {
+                var frames = Math.Max(1, (int)Math.Ceiling(durationMilliseconds / 16d));
+                var stopwatch = Stopwatch.StartNew();
+                for (var frame = 1; frame <= frames; frame++)
+                {
+                    var progress = frame / (double)frames;
+                    platform.MoveCursor(
+                        (int)Math.Round(start.X + ((long)x - start.X) * progress),
+                        (int)Math.Round(start.Y + ((long)y - start.Y) * progress));
+
+                    var remaining = TimeSpan.FromMilliseconds(durationMilliseconds * progress) - stopwatch.Elapsed;
+                    if (frame < frames && remaining > TimeSpan.Zero)
+                    {
+                        Thread.Sleep(remaining);
+                    }
+                }
+            }
+        }
+
         Delay.Sleep(delay);
-        return $"Moved cursor to ({x}, {y}).";
+        return $"Moved cursor to ({x}, {y}) over {durationMilliseconds} ms.";
     }
 
     /// <inheritdoc />
@@ -293,7 +328,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
     }
 
     /// <inheritdoc />
-    public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage)
+    public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage, bool highlightCursor = true)
     {
         if (handle <= 0)
         {
@@ -317,7 +352,7 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
         }
 
         var bounds = new Rectangle(window.Bounds.Left, window.Bounds.Top, window.Bounds.Width, window.Bounds.Height);
-        return Screenshot(path, includeImage, bounds);
+        return Screenshot(path, includeImage, bounds, highlightCursor);
     }
 
     /// <inheritdoc />
@@ -672,14 +707,14 @@ internal interface IComputerRunPlatform
     /// </summary>
     /// <param name="bounds">The area to capture.</param>
     /// <returns>PNG byte array.</returns>
-    byte[] CapturePng(Rectangle bounds);
+    byte[] CapturePng(Rectangle bounds, bool highlightCursor);
 
     /// <summary>
     /// Captures a PNG image for the specified bounds and writes it to disk.
     /// </summary>
     /// <param name="bounds">The area to capture.</param>
     /// <param name="path">Destination file path.</param>
-    void SaveScreenshotPng(Rectangle bounds, string path);
+    void SaveScreenshotPng(Rectangle bounds, string path, bool highlightCursor);
 
     /// <summary>
     /// Moves the cursor to absolute desktop coordinates.

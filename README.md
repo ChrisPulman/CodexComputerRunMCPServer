@@ -28,8 +28,8 @@ Note:
 
 Codex Computer Run gives an agent a minimal, fast desktop-control layer for:
 
-- **Observe** the full desktop via PNG screenshots.
-- **Point** the cursor at absolute virtual-screen coordinates.
+- **Observe** the full desktop via PNG screenshots with an optional red cursor halo on Windows.
+- **Point** the real cursor at absolute virtual-screen coordinates, instantly or along a visible timed path.
 - **Click** left, right, or middle mouse buttons where supported, including repeated clicks. The built-in macOS adapter supports left and right clicks.
 - **Scroll** the wheel at the current cursor position or supplied coordinates.
 - **Press** single keys and keyboard shortcuts such as `ctrl+l` or `ctrl+shift+escape`.
@@ -46,7 +46,7 @@ Windows remains the primary implementation. Linux and macOS support keeps the sa
 |------|------------------|
 | Version | `1.2.0` |
 | Target framework | `net10.0` |
-| Windows | Native Win32 implementation with virtual-screen capture, direct Unicode `SendInput`, cursor position, and visible top-level window enumeration |
+| Windows | Native Win32 implementation with virtual-screen capture, a red cursor halo in screenshots, direct Unicode `SendInput`, cursor position, and visible top-level window enumeration |
 | Linux | Command-backed adapter using `xdotool` for pointer and keyboard input, `xrandr` for display-geometry fallback, `wmctrl` or `xdotool` for windows, screenshot command fallbacks, and text-entry command fallbacks |
 | macOS | Command-backed adapter using `screencapture`, `pbcopy`, `osascript`, and `cliclick`; macOS middle-click automation is not supported by the built-in adapter |
 | Unsupported OS | Deterministic unsupported-platform errors instead of silent no-ops |
@@ -110,6 +110,7 @@ Captures the current desktop as PNG.
 - `path` *(optional)* - output PNG path. If omitted, the image is returned in memory and no temporary file is created.
 - `include_image` *(default: `true`)* - include PNG image data in the MCP tool result.
 - `left`, `top`, `width`, `height` *(optional)* - capture only a screen-space region. Provide all four values together; `width` and `height` must be greater than zero.
+- `highlight_cursor` *(default: `true`)* - draw a red halo at the live cursor position in the captured image on Windows. Set to `false` for an unmarked capture.
 
 **Response:** The first content block is JSON metadata with `message`, `path`, `mimeType`, `platform`, `left`, `top`, `width`, and `height`. When `include_image` is `true`, a PNG image block is also returned.
 
@@ -126,6 +127,7 @@ Moves the cursor to absolute desktop coordinates.
 **Parameters:**
 - `x` - absolute X coordinate.
 - `y` - absolute Y coordinate.
+- `duration_ms` *(default: `350`)* - move along the path over 0–10000 milliseconds. Use `0` for an instant move.
 - `delay` *(optional)* - seconds to wait after the action.
 
 **When to use:** Use before a click or hover-sensitive action.
@@ -243,6 +245,7 @@ Captures the screen-space bounds of a visible window selected by native handle. 
 - `handle` - native window handle returned by `list_windows` or `find_windows`.
 - `path` *(optional)* - output PNG path.
 - `include_image` *(optional)* - include PNG bytes in the MCP result; defaults to `true`.
+- `highlight_cursor` *(default: `true`)* - draw the red cursor halo on Windows; set to `false` to omit it.
 
 **When to use:** Use after targeting a window when the agent needs a focused visual observation or wants to avoid capturing the entire multi-monitor desktop.
 

@@ -56,10 +56,10 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
     }
 
     /// <inheritdoc />
-    public byte[] CapturePng(Rectangle bounds) => CaptureViaTempFile(path => SaveScreenshotPng(bounds, path));
+    public byte[] CapturePng(Rectangle bounds, bool highlightCursor = true) => CaptureViaTempFile(path => SaveScreenshotPng(bounds, path, highlightCursor));
 
     /// <inheritdoc />
-    public void SaveScreenshotPng(Rectangle bounds, string path)
+    public void SaveScreenshotPng(Rectangle bounds, string path, bool highlightCursor = true)
     {
         if (CommandRunner.CommandExists("gnome-screenshot"))
         {

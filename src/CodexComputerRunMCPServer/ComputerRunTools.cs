@@ -29,18 +29,19 @@ public static class ComputerRunTools
     /// A <see cref="CallToolResult"/> containing the screenshot result payload.
     /// </returns>
     [McpServerTool]
-    [Description("Capture the current desktop or a requested screen region as a PNG. Pass path to save it on disk; omit path for an in-memory MCP image result.")]
+    [Description("Capture the current desktop or a requested screen region as a PNG. On Windows, highlight the live cursor with a red halo. Pass path to save it on disk; omit path for an in-memory MCP image result.")]
     public static CallToolResult screenshot(
         [Description("Optional output PNG path. If omitted, no temporary file is created.")] string? path = null,
         [Description("Include PNG image data in the MCP tool result.")] bool include_image = true,
         [Description("Optional left edge of a screen-space capture region. Provide all four region values together.")] int? left = null,
         [Description("Optional top edge of a screen-space capture region. Provide all four region values together.")] int? top = null,
         [Description("Optional width of a screen-space capture region. Must be greater than zero.")] int? width = null,
-        [Description("Optional height of a screen-space capture region. Must be greater than zero.")] int? height = null)
+        [Description("Optional height of a screen-space capture region. Must be greater than zero.")] int? height = null,
+        [Description("Draw a red halo at the live cursor position in the captured image (Windows only).")] bool highlight_cursor = true)
         => Invoke(
             "screenshot",
-            new { hasPath = !string.IsNullOrWhiteSpace(path), includeImage = include_image, hasRegion = left.HasValue },
-            service => service.Screenshot(path, include_image, CreateScreenshotRegion(left, top, width, height)));
+            new { hasPath = !string.IsNullOrWhiteSpace(path), includeImage = include_image, hasRegion = left.HasValue, highlight_cursor },
+            service => service.Screenshot(path, include_image, CreateScreenshotRegion(left, top, width, height), highlight_cursor));
 
     /// <summary>
     /// Moves the mouse cursor to absolute desktop coordinates.
@@ -50,13 +51,14 @@ public static class ComputerRunTools
     /// <param name="delay">Optional post-action delay in seconds.</param>
     /// <returns>A JSON status string returned by the runtime service.</returns>
     [McpServerTool]
-    [Description("Move the mouse cursor to absolute desktop coordinates.")]
+    [Description("Move the real desktop cursor to absolute coordinates over a duration, so intermediate positions are visible. Set duration_ms to 0 for an instant move.")]
     public static string move_mouse(
         [Description("Absolute X coordinate.")] int x,
         [Description("Absolute Y coordinate.")] int y,
         [Description("Optional delay after the action, in seconds.")] double? delay = null,
-        [Description("Optional native window handle previously returned by find_windows. When supplied, movement is aborted if that window is stale or minimized.")] long? target_handle = null)
-        => InvokeControl("move_mouse", new { x, y, delay, target_handle }, service => service.MoveMouse(x, y, delay, target_handle));
+        [Description("Optional native window handle previously returned by find_windows. When supplied, movement is aborted if that window is stale or minimized.")] long? target_handle = null,
+        [Description("Movement time in milliseconds from 0 to 10000; defaults to 350 for a visible smooth move.")] int duration_ms = 350)
+        => InvokeControl("move_mouse", new { x, y, delay, target_handle, duration_ms }, service => service.MoveMouse(x, y, delay, target_handle, duration_ms));
 
     /// <summary>
     /// Performs a mouse click at the current cursor position or at provided coordinates.
@@ -181,12 +183,13 @@ public static class ComputerRunTools
     /// Captures a window's screen-space bounds by native handle.
     /// </summary>
     [McpServerTool]
-    [Description("Capture a visible top-level window by native handle returned by list_windows or find_windows. The capture is screen-space and does not reveal occluded content.")]
+    [Description("Capture a visible top-level window by native handle returned by list_windows or find_windows. On Windows, the live cursor is marked with a red halo. The capture is screen-space and does not reveal occluded content.")]
     public static CallToolResult screenshot_window(
         [Description("Native window handle returned by list_windows or find_windows.")] long handle,
         [Description("Optional output PNG path. If omitted, no file is created.")] string? path = null,
-        [Description("Include PNG image data in the MCP tool result.")] bool include_image = true)
-        => Invoke("screenshot_window", new { handle, hasPath = !string.IsNullOrWhiteSpace(path), includeImage = include_image }, service => service.ScreenshotWindow(handle, path, include_image));
+        [Description("Include PNG image data in the MCP tool result.")] bool include_image = true,
+        [Description("Draw a red halo at the live cursor position in the captured image (Windows only).")] bool highlight_cursor = true)
+        => Invoke("screenshot_window", new { handle, hasPath = !string.IsNullOrWhiteSpace(path), includeImage = include_image, highlight_cursor }, service => service.ScreenshotWindow(handle, path, include_image, highlight_cursor));
 
     /// <summary>
     /// Verifies that a previously selected window still matches its expected identity and state.

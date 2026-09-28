@@ -41,13 +41,14 @@ The policy changes how much repetitive confirmation and screenshot checking is n
    - Use `verify_window` before input when the handle may be stale, and `wait_for_window` after launching or recovering a named application.
     - Use `activate_window` with a handle returned by `list_windows` or `find_windows` when the intended target is not already foreground; wait for its success result before continuing.
    - Use `screenshot_window` when a target handle and bounds are known; use full `screenshot` when the wider desktop context matters.
+   - Windows screenshots mark the live cursor with a red halo by default; pass `highlight_cursor: false` when you need an unmarked image.
    - Use `cursor_position` before relying on the current pointer location.
 2. Plan in absolute desktop coordinates:
    - Treat coordinates as desktop coordinates, not browser or app-relative coordinates.
    - Read screenshot metadata for `platform`, `left`, `top`, `width`, and `height`; multi-monitor layouts can have negative `left` or `top` values.
    - Move or click only when the target application and coordinates are known.
 3. Act with the narrowest tool:
-    - Use `move_mouse` for hover or to position before a click; pass `target_handle` when the intended window is known.
+   - Use `move_mouse` for hover or to position before a click; its default 350 ms path makes cursor movement visible. Use `duration_ms: 0` for an instant move and pass `target_handle` when the intended window is known.
     - Use `click` for buttons, menus, tabs, selections, and context menus; pass `target_handle` so a focus change aborts instead of clicking another app.
     - Use `scroll` for pages, lists, combo boxes, and scrollable panes; pass `target_handle` when the scroll target is a known window.
    - Use `press_key` for one key such as `enter`, `tab`, `escape`, `f5`, arrows, or a single character.

@@ -15,10 +15,10 @@ internal sealed class UnsupportedComputerRunPlatform(string osDescription) : ICo
     public Rectangle GetVirtualScreenBounds() => throw CreateException();
 
     /// <inheritdoc />
-    public byte[] CapturePng(Rectangle bounds) => throw CreateException();
+    public byte[] CapturePng(Rectangle bounds, bool highlightCursor = true) => throw CreateException();
 
     /// <inheritdoc />
-    public void SaveScreenshotPng(Rectangle bounds, string path) => throw CreateException();
+    public void SaveScreenshotPng(Rectangle bounds, string path, bool highlightCursor = true) => throw CreateException();
 
     /// <inheritdoc />
     public void MoveCursor(int x, int y) => throw CreateException();

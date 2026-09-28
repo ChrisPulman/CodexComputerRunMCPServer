@@ -58,7 +58,7 @@ public class McpIntegrationTests
         using var restoreLease = ComputerRunToolRuntime.ReplaceControlLeaseForTests(
             new DesktopControlLease(enabled: false, TimeSpan.Zero));
 
-        _ = ComputerRunTools.move_mouse(1, 2);
+        _ = ComputerRunTools.move_mouse(1, 2, duration_ms: 0);
         _ = ComputerRunTools.click(button: "middle");
         _ = ComputerRunTools.scroll();
         _ = ComputerRunTools.press_key("enter");
@@ -68,8 +68,8 @@ public class McpIntegrationTests
         _ = ComputerRunTools.list_windows();
         _ = ComputerRunTools.find_windows(process_name: "notepad", title_contains: "untitled", foreground_only: false, include_minimized: true, limit: 10);
         _ = ComputerRunTools.activate_window(100, restore: false);
-        _ = ComputerRunTools.screenshot(include_image: false);
-        _ = ComputerRunTools.screenshot_window(100, include_image: false);
+        _ = ComputerRunTools.screenshot(include_image: false, highlight_cursor: false);
+        _ = ComputerRunTools.screenshot_window(100, include_image: false, highlight_cursor: false);
         _ = ComputerRunTools.verify_window(100, process_name: "notepad", title_contains: "untitled", require_foreground: true, allow_minimized: false);
         _ = ComputerRunTools.wait_for_window(process_name: "notepad", title_contains: "untitled", foreground_only: false, include_minimized: true, timeout_ms: 0, poll_ms: 25);
         _ = ComputerRunTools.close_window(100, timeout_ms: 0);
@@ -92,6 +92,9 @@ public class McpIntegrationTests
         _ = ComputerRunTools.open_url("https://example.test/", dry_run: true);
 
         await Assert.That(service.Calls).IsEqualTo(15);
+        await Assert.That(service.MouseMovementDurationMs).IsEqualTo(0);
+        await Assert.That(service.ScreenshotCursorHighlight).IsFalse();
+        await Assert.That(service.ScreenshotWindowCursorHighlight).IsFalse();
     }
 
     [Test]
@@ -145,15 +148,23 @@ public class McpIntegrationTests
     {
         public int Calls { get; private set; }
 
-        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region)
+        public int? MouseMovementDurationMs { get; private set; }
+
+        public bool? ScreenshotCursorHighlight { get; private set; }
+
+        public bool? ScreenshotWindowCursorHighlight { get; private set; }
+
+        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region, bool highlightCursor)
         {
             Calls++;
+            ScreenshotCursorHighlight = highlightCursor;
             return new CallToolResult { Content = [] };
         }
 
-        public string MoveMouse(int x, int y, double? delay, long? targetHandle)
+        public string MoveMouse(int x, int y, double? delay, long? targetHandle, int durationMilliseconds)
         {
             Calls++;
+            MouseMovementDurationMs = durationMilliseconds;
             return "move";
         }
 
@@ -205,9 +216,10 @@ public class McpIntegrationTests
             return "[]";
         }
 
-        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage)
+        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage, bool highlightCursor)
         {
             Calls++;
+            ScreenshotWindowCursorHighlight = highlightCursor;
             return new CallToolResult { Content = [] };
         }
 

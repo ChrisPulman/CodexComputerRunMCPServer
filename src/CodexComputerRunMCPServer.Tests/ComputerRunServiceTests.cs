@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 
@@ -18,6 +19,7 @@ public class ComputerRunServiceTests
         await Assert.That(platform.SavedScreenshots.Count).IsEqualTo(0);
         await Assert.That(result.Content.Count).IsEqualTo(2);
         await Assert.That(result.Content.OfType<ImageContentBlock>().Any()).IsTrue();
+        await Assert.That(platform.CursorHighlights.Single()).IsTrue();
 
         var metadata = ReadMetadata(result);
         await Assert.That(metadata.GetProperty("path").ValueKind).IsEqualTo(JsonValueKind.Null);
@@ -75,10 +77,11 @@ public class ComputerRunServiceTests
 
         try
         {
-            var result = service.Screenshot(output, includeImage: false);
+            var result = service.Screenshot(output, includeImage: false, highlightCursor: false);
 
             await Assert.That(File.Exists(output)).IsTrue();
             await Assert.That(platform.SavedScreenshots.Count).IsEqualTo(1);
+            await Assert.That(platform.CursorHighlights.Single()).IsFalse();
             await Assert.That(ReadMetadata(result).GetProperty("path").GetString()).IsEqualTo(output);
         }
         finally
@@ -115,17 +118,49 @@ public class ComputerRunServiceTests
         var platform = new TestComputerRunPlatform();
         var service = new ComputerRunService(platform);
 
-        var moved = service.MoveMouse(5, 6, delay: null, targetHandle: null);
+        var moved = service.MoveMouse(5, 6, delay: null, targetHandle: null, durationMilliseconds: 48);
         var clicked = service.Click(7, 8, "right", clicks: 2, interval: 0.01, delay: null, targetHandle: null);
         var scrolled = service.Scroll(-4, 9, 10, delay: null, targetHandle: null);
 
         await Assert.That(moved).Contains("(5, 6)");
         await Assert.That(clicked).Contains("Clicked right 2 time(s)");
         await Assert.That(scrolled).Contains("-4");
-        await Assert.That(platform.CursorMoves.Count).IsEqualTo(3);
+        await Assert.That(platform.CursorMoves.Count >= 5).IsTrue();
+        await Assert.That(platform.CursorMoves[^1]).IsEqualTo((9, 10));
         await Assert.That(platform.Clicks[0].Button).IsEqualTo(MouseButton.Right);
         await Assert.That(platform.Clicks[0].Clicks).IsEqualTo(2);
         await Assert.That(platform.Scrolls[0]).IsEqualTo(-4);
+    }
+
+    [Test]
+    public async Task MoveMouse_ZeroDurationMovesImmediately_AndRejectsUnboundedDurations()
+    {
+        var platform = new TestComputerRunPlatform();
+        var service = new ComputerRunService(platform);
+
+        _ = service.MoveMouse(5, 6, delay: null, targetHandle: null, durationMilliseconds: 0);
+
+        await Assert.That(platform.CursorMoves.Single()).IsEqualTo((5, 6));
+        await Assert.That(platform.CursorMoves.Count).IsEqualTo(1);
+        await Assert.That(() => service.MoveMouse(1, 2, null, null, durationMilliseconds: 10_001))
+            .Throws<ArgumentOutOfRangeException>();
+        await Assert.That(platform.CursorMoves.Count).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task WindowsCursorHighlight_RendersRedAtTheCursorPosition()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(6, 1))
+        {
+            return;
+        }
+
+        using var bitmap = new Bitmap(60, 60, PixelFormat.Format32bppArgb);
+        using var graphics = Graphics.FromImage(bitmap);
+        WindowsComputerRunPlatform.DrawCursorHighlight(graphics, new Rectangle(0, 0, 60, 60), new Point(30, 30));
+        var pixel = bitmap.GetPixel(30, 30);
+
+        await Assert.That(pixel.R > pixel.G && pixel.R > pixel.B).IsTrue();
     }
 
     [Test]
@@ -215,6 +250,7 @@ public class ComputerRunServiceTests
         var result = service.ScreenshotWindow(100, path: null, includeImage: true);
 
         await Assert.That(platform.Captures.Single()).IsEqualTo(new Rectangle(10, 20, 640, 480));
+        await Assert.That(platform.CursorHighlights.Single()).IsTrue();
         await Assert.That(ReadMetadata(result).GetProperty("width").GetInt32()).IsEqualTo(640);
         await Assert.That(ReadMetadata(result).GetProperty("height").GetInt32()).IsEqualTo(480);
     }

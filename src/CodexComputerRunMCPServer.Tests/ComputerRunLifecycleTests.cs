@@ -195,9 +195,9 @@ public class ComputerRunLifecycleTests
             return "{}";
         }
 
-        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region) => throw new NotSupportedException();
+        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region, bool highlightCursor) => throw new NotSupportedException();
 
-        public string MoveMouse(int x, int y, double? delay, long? targetHandle) => throw new NotSupportedException();
+        public string MoveMouse(int x, int y, double? delay, long? targetHandle, int durationMilliseconds) => throw new NotSupportedException();
 
         public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
             => throw new NotSupportedException();
@@ -215,7 +215,7 @@ public class ComputerRunLifecycleTests
         public string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit)
             => throw new NotSupportedException();
 
-        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage) => throw new NotSupportedException();
+        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage, bool highlightCursor) => throw new NotSupportedException();
 
         public string VerifyWindow(long handle, string? processName, string? titleContains, bool requireForeground, bool allowMinimized)
             => throw new NotSupportedException();
@@ -240,13 +240,13 @@ public class ComputerRunLifecycleTests
             return "{}";
         }
 
-        public string MoveMouse(int x, int y, double? delay, long? targetHandle)
+        public string MoveMouse(int x, int y, double? delay, long? targetHandle, int durationMilliseconds)
         {
             MoveCalls++;
             return "move";
         }
 
-        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region) => throw new NotSupportedException();
+        public CallToolResult Screenshot(string? path, bool includeImage, System.Drawing.Rectangle? region, bool highlightCursor) => throw new NotSupportedException();
 
         public string Click(int? x, int? y, string button, int clicks, double interval, double? delay, long? targetHandle)
             => throw new NotSupportedException();
@@ -264,7 +264,7 @@ public class ComputerRunLifecycleTests
         public string FindWindows(string? processName, string? titleContains, bool foregroundOnly, bool includeMinimized, int limit)
             => throw new NotSupportedException();
 
-        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage) => throw new NotSupportedException();
+        public CallToolResult ScreenshotWindow(long handle, string? path, bool includeImage, bool highlightCursor) => throw new NotSupportedException();
 
         public string VerifyWindow(long handle, string? processName, string? titleContains, bool requireForeground, bool allowMinimized)
             => throw new NotSupportedException();
