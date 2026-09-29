@@ -120,12 +120,12 @@ public class ExternalCommandPlatformTests
     }
 
     [Test]
-    public async Task LinuxPlatform_PasteUsesClipboardThenControlV()
+    public async Task LinuxPlatform_TextEntryUsesClipboardThenControlV()
     {
         var runner = new RecordingCommandRunner("wl-copy", "xdotool");
         var platform = new LinuxComputerRunPlatform(runner);
 
-        platform.PasteText("hello");
+        platform.TypeText("hello");
 
         await Assert.That(runner.Invocations[0].FileName).IsEqualTo("wl-copy");
         await Assert.That(runner.Invocations[0].StandardInput).IsEqualTo("hello");
@@ -133,12 +133,12 @@ public class ExternalCommandPlatformTests
     }
 
     [Test]
-    public async Task LinuxPlatform_PasteFallsBackToXdotoolTypeWhenClipboardToolsAreMissing()
+    public async Task LinuxPlatform_TextEntryFallsBackToXdotoolTypeWhenClipboardToolsAreMissing()
     {
         var runner = new RecordingCommandRunner("xdotool");
         var platform = new LinuxComputerRunPlatform(runner);
 
-        platform.PasteText("hello");
+        platform.TypeText("hello");
 
         await Assert.That(runner.Invocations[0].ArgumentText).IsEqualTo("type --clearmodifiers --delay 0 -- hello");
     }
@@ -278,12 +278,12 @@ public class ExternalCommandPlatformTests
     }
 
     [Test]
-    public async Task MacPlatform_PasteUsesPbcopyAndCommandV()
+    public async Task MacPlatform_TextEntryUsesPbcopyAndCommandV()
     {
         var runner = new RecordingCommandRunner("pbcopy", "osascript");
         var platform = new MacComputerRunPlatform(runner);
 
-        platform.PasteText("hello");
+        platform.TypeText("hello");
 
         await Assert.That(runner.Invocations[0].FileName).IsEqualTo("pbcopy");
         await Assert.That(runner.Invocations[0].StandardInput).IsEqualTo("hello");

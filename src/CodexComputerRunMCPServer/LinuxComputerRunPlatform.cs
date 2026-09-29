@@ -56,10 +56,10 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
     }
 
     /// <inheritdoc />
-    public byte[] CapturePng(Rectangle bounds) => CaptureViaTempFile(path => SaveScreenshotPng(bounds, path));
+    public byte[] CapturePng(Rectangle bounds, bool highlightCursor = true) => CaptureViaTempFile(path => SaveScreenshotPng(bounds, path, highlightCursor));
 
     /// <inheritdoc />
-    public void SaveScreenshotPng(Rectangle bounds, string path)
+    public void SaveScreenshotPng(Rectangle bounds, string path, bool highlightCursor = true)
     {
         if (CommandRunner.CommandExists("gnome-screenshot"))
         {
@@ -97,6 +97,44 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
             .ToDictionary(parts => parts[0], parts => parts[1], StringComparer.OrdinalIgnoreCase);
 
         return new DesktopPoint(ParseInt(values["X"], "X"), ParseInt(values["Y"], "Y"));
+    }
+
+    /// <inheritdoc />
+    public void ActivateWindow(long handle, bool restore)
+    {
+        var windowId = $"0x{handle:X}";
+        if (CommandRunner.CommandExists("wmctrl"))
+        {
+            _ = RunRequired("wmctrl", ["-ia", windowId]);
+            return;
+        }
+
+        if (CommandRunner.CommandExists("xdotool"))
+        {
+            _ = RunXdotool(["windowactivate", "--sync", handle.ToString()]);
+            return;
+        }
+
+        throw MissingDependency(PlatformName, "wmctrl", "xdotool");
+    }
+
+    /// <inheritdoc />
+    public void RequestCloseWindow(long handle)
+    {
+        var windowId = $"0x{handle:X}";
+        if (CommandRunner.CommandExists("wmctrl"))
+        {
+            _ = RunRequired("wmctrl", ["-ic", windowId]);
+            return;
+        }
+
+        if (CommandRunner.CommandExists("xdotool"))
+        {
+            _ = RunXdotool(["windowclose", handle.ToString()]);
+            return;
+        }
+
+        throw MissingDependency(PlatformName, "wmctrl", "xdotool");
     }
 
     /// <inheritdoc />
@@ -168,7 +206,7 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
     }
 
     /// <inheritdoc />
-    public void PasteText(string text)
+    public void TypeText(string text)
     {
         if (TrySetClipboardText(text))
         {

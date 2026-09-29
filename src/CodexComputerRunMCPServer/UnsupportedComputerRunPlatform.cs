@@ -15,10 +15,10 @@ internal sealed class UnsupportedComputerRunPlatform(string osDescription) : ICo
     public Rectangle GetVirtualScreenBounds() => throw CreateException();
 
     /// <inheritdoc />
-    public byte[] CapturePng(Rectangle bounds) => throw CreateException();
+    public byte[] CapturePng(Rectangle bounds, bool highlightCursor = true) => throw CreateException();
 
     /// <inheritdoc />
-    public void SaveScreenshotPng(Rectangle bounds, string path) => throw CreateException();
+    public void SaveScreenshotPng(Rectangle bounds, string path, bool highlightCursor = true) => throw CreateException();
 
     /// <inheritdoc />
     public void MoveCursor(int x, int y) => throw CreateException();
@@ -39,10 +39,16 @@ internal sealed class UnsupportedComputerRunPlatform(string osDescription) : ICo
     public void PressHotkey(IReadOnlyList<byte> virtualKeys) => throw CreateException();
 
     /// <inheritdoc />
-    public void PasteText(string text) => throw CreateException();
+    public void TypeText(string text) => throw CreateException();
 
     /// <inheritdoc />
     public IReadOnlyList<WindowInfo> ListWindows(int limit) => throw CreateException();
+
+    /// <inheritdoc />
+    public void ActivateWindow(long handle, bool restore) => throw CreateException();
+
+    /// <inheritdoc />
+    public void RequestCloseWindow(long handle) => throw CreateException();
 
     /// <inheritdoc />
     public short KeyScan(char character) => KeyboardInputDefaults.KeyScan(character);
