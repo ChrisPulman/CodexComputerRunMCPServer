@@ -31,7 +31,8 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 ## Platform Notes
 
 - Windows is the native implementation and uses Win32 desktop APIs.
-- Linux and macOS use best-effort command adapters. If a tool reports a missing dependency such as `xdotool`, `gnome-screenshot`, `cliclick`, or `osascript`, explain the dependency instead of retrying unrelated commands.
+- Linux and macOS use best-effort command adapters. Linux X11 uses `xdotool`; Linux Wayland uses `wdotool` and a compositor-compatible screenshot command such as `grim`, `gnome-screenshot`, or KDE Spectacle. If a tool reports a missing dependency, explain it instead of retrying unrelated commands.
+- Wayland compositors may not expose the global cursor position. If `cursor_position` is unsupported, use the screenshot as the coordinate reference; `move_mouse` can still send a direct move when timed movement cannot query the starting point. Exact rectangular screenshots require `grim`; GNOME Screenshot and Spectacle provide full-desktop capture. GNOME window management with `wdotool` needs its companion Shell extension. Multi-monitor Wayland coordinate layouts have not been verified; screenshot bounds are reported from the image size at origin `(0, 0)`.
 - The server must run in the signed-in graphical session for the desktop it controls.
 
 ## Operating Protocol

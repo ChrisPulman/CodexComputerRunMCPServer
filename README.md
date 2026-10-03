@@ -21,7 +21,7 @@ Note:
 - These install links are prepared for the intended NuGet package identity `CP.CodexComputerRun.Mcp.Server`.
 - If the latest package has not been published yet, use the manual source-build or published-executable configuration below.
 - Run the server from the signed-in desktop session you want to control. Windows desktop automation must be launched from Windows, not WSL.
-- Linux support expects `xdotool` for pointer and keyboard actions, `xrandr` as a display-geometry fallback, `wmctrl` or `xdotool` for window discovery, one of `gnome-screenshot`, `grim`, or ImageMagick `import` for screenshots, and one of `wl-copy`, `xclip`, `xsel`, or `xdotool` for text entry.
+- Linux X11 sessions use `xdotool` and `wmctrl` where available. Wayland sessions use [`wdotool`](https://github.com/cushycush/wdotool) for pointer, keyboard, and window actions, plus a compositor-compatible screenshot command such as `grim`, `gnome-screenshot`, or KDE's `spectacle`. Install the command-line tools in the same signed-in graphical session as the MCP server.
 - macOS support uses `screencapture`, `pbcopy`, and `osascript`; pointer actions require `cliclick`. Screen Recording and Accessibility permissions may be required by macOS.
 
 ## What Codex Computer Run Helps With
@@ -47,13 +47,19 @@ Windows remains the primary implementation. Linux and macOS support keeps the sa
 | Version | `1.2.0` |
 | Target framework | `net10.0` |
 | Windows | Native Win32 implementation with virtual-screen capture, a red cursor halo in screenshots, direct Unicode `SendInput`, cursor position, and visible top-level window enumeration |
-| Linux | Command-backed adapter using `xdotool` for pointer and keyboard input, `xrandr` for display-geometry fallback, `wmctrl` or `xdotool` for windows, screenshot command fallbacks, and text-entry command fallbacks |
+| Linux | Command-backed adapter using `xdotool`/`wmctrl` on X11 or `wdotool` on Wayland, with compositor-compatible screenshot commands |
 | macOS | Command-backed adapter using `screencapture`, `pbcopy`, `osascript`, and `cliclick`; macOS middle-click automation is not supported by the built-in adapter |
 | Unsupported OS | Deterministic unsupported-platform errors instead of silent no-ops |
 | Session requirement | Signed-in interactive desktop session |
 | Transport | MCP stdio |
 
 Do not run this server from WSL to control a Windows desktop. Building from WSL through Windows `dotnet.exe` can work, but the MCP server itself must be launched by a Windows MCP client or Windows PowerShell session.
+
+### Linux Wayland
+
+Wayland sessions are detected from `XDG_SESSION_TYPE=wayland` or `WAYLAND_DISPLAY`. Install `wdotool` for desktop input and window actions, and install a screenshot utility supported by the compositor (for example, `grim` on wlroots compositors, `gnome-screenshot` on GNOME, or `spectacle` on KDE Plasma). The MCP server must inherit the graphical session environment.
+
+Compositors control which desktop information they expose. `cursor_position` reports an actionable unsupported error when the compositor does not provide the global pointer position; `move_mouse` still moves to its target and falls back to a direct move when it cannot query a starting point. On GNOME, `wdotool` window discovery and other window controls require its companion Shell extension; its portal input backend may show a first-use permission prompt. Screenshot bounds are derived from the captured PNG when compositor geometry is unavailable. Exact rectangular screenshots require `grim`; GNOME Screenshot and Spectacle are used for full-desktop capture. Multi-monitor Wayland coordinate layouts have not been verified; screenshot bounds are currently reported from image size at origin `(0, 0)`.
 
 ## Codex Protocol
 

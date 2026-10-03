@@ -148,6 +148,21 @@ public class ComputerRunServiceTests
     }
 
     [Test]
+    public async Task MouseActions_FallBackWhenPlatformCannotReportCursorPosition()
+    {
+        var platform = new TestComputerRunPlatform { CursorPositionUnsupported = true };
+        var service = new ComputerRunService(platform);
+
+        var moved = service.MoveMouse(5, 6, delay: null, targetHandle: null);
+        var clicked = service.Click(null, null, "left", clicks: 1, interval: 0, delay: null, targetHandle: null);
+
+        await Assert.That(moved).Contains("Moved cursor directly to (5, 6)");
+        await Assert.That(platform.CursorMoves.Single()).IsEqualTo((5, 6));
+        await Assert.That(clicked).Contains("does not report the current cursor position");
+        await Assert.That(platform.Clicks.Single().Button).IsEqualTo(MouseButton.Left);
+    }
+
+    [Test]
     public async Task WindowsCursorHighlight_RendersRedAtTheCursorPosition()
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(6, 1))

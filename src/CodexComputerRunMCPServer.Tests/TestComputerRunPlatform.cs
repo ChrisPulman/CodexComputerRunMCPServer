@@ -12,6 +12,8 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public DesktopPoint CursorPosition { get; set; } = new(123, 456);
 
+    public bool CursorPositionUnsupported { get; set; }
+
     public List<(int X, int Y)> CursorMoves { get; } = [];
 
     public List<(MouseButton Button, int Clicks, TimeSpan Interval)> Clicks { get; } = [];
@@ -70,7 +72,10 @@ internal sealed class TestComputerRunPlatform : IComputerRunPlatform
 
     public void MoveCursor(int x, int y) => CursorMoves.Add((x, y));
 
-    public DesktopPoint GetCursorPosition() => CursorPosition;
+    public DesktopPoint GetCursorPosition()
+        => CursorPositionUnsupported
+            ? throw new PlatformNotSupportedException("Cursor position is unavailable.")
+            : CursorPosition;
 
     public void Click(MouseButton button, int clicks, TimeSpan interval) => Clicks.Add((button, clicks, interval));
 

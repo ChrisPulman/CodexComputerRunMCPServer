@@ -197,7 +197,18 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
         }
         else
         {
-            var start = platform.GetCursorPosition();
+            DesktopPoint start;
+            try
+            {
+                start = platform.GetCursorPosition();
+            }
+            catch (PlatformNotSupportedException)
+            {
+                platform.MoveCursor(x, y);
+                Delay.Sleep(delay);
+                return $"Moved cursor directly to ({x}, {y}); this platform does not expose the current cursor position for timed movement.";
+            }
+
             if (start.X == x && start.Y == y)
             {
                 platform.MoveCursor(x, y);
@@ -242,8 +253,15 @@ internal sealed class ComputerRunService(IComputerRunPlatform platform) : ICompu
         platform.Click(parsedButton, clicks, intervalDelay);
 
         Delay.Sleep(delay);
-        var point = platform.GetCursorPosition();
-        return $"Clicked {button} {clicks} time(s) at ({point.X}, {point.Y}).";
+        try
+        {
+            var point = platform.GetCursorPosition();
+            return $"Clicked {button} {clicks} time(s) at ({point.X}, {point.Y}).";
+        }
+        catch (PlatformNotSupportedException)
+        {
+            return $"Clicked {button} {clicks} time(s); this platform does not report the current cursor position.";
+        }
     }
 
     /// <inheritdoc />
