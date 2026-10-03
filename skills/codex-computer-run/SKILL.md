@@ -33,6 +33,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
 - Windows is the native implementation and uses Win32 desktop APIs.
 - Linux and macOS use best-effort command adapters. Linux X11 uses `xdotool`; Linux Wayland uses `wdotool` and a compositor-compatible screenshot command such as `grim`, `gnome-screenshot`, or KDE Spectacle. If a tool reports a missing dependency, explain it instead of retrying unrelated commands.
 - Wayland compositors may not expose the global cursor position. If `cursor_position` is unsupported, use the screenshot as the coordinate reference; `move_mouse` can still send a direct move when timed movement cannot query the starting point. Exact rectangular screenshots require `grim`; GNOME Screenshot and Spectacle provide full-desktop capture. GNOME window management with `wdotool` needs its companion Shell extension. Multi-monitor Wayland coordinate layouts have not been verified; screenshot bounds are reported from the image size at origin `(0, 0)`.
+- Some Wayland backends do not expose window process IDs. In that case, continue using title-based discovery and window actions; process-name filters need available PID data.
 - The server must run in the signed-in graphical session for the desktop it controls.
 
 ## Operating Protocol
@@ -52,7 +53,7 @@ The policy changes how much repetitive confirmation and screenshot checking is n
    - Use `move_mouse` for hover or to position before a click; its default 350 ms path makes cursor movement visible. Use `duration_ms: 0` for an instant move and pass `target_handle` when the intended window is known.
     - Use `click` for buttons, menus, tabs, selections, and context menus; pass `target_handle` so a focus change aborts instead of clicking another app.
     - Use `scroll` for pages, lists, combo boxes, and scrollable panes; pass `target_handle` when the scroll target is a known window.
-   - Use `press_key` for one key such as `enter`, `tab`, `escape`, `f5`, arrows, or a single character.
+   - Use `press_key` for one key such as `enter`, `tab`, `escape`, `f5`, arrows, or a single character. Windows and Linux also accept `media_play_pause`, `media_next_track`, `media_previous_track`, `media_stop`, `volume_mute`, `volume_down`, and `volume_up`; leave `target_handle` unset for these global media keys. The built-in macOS adapter reports these as unsupported.
     - Use `hotkey` for shortcuts such as `ctrl+l`, `ctrl+shift+p`, `alt+tab`, or `ctrl+shift+escape`. When a window handle is known, pass it as `target_handle`.
     - Use `type_text` for text entry and pass `target_handle` whenever focus matters. Windows injects Unicode directly without changing the clipboard; Linux/macOS may use their native clipboard or text-entry fallback.
     - Use `close_window` for an explicitly identified window instead of a global `alt+f4`; it requests a graceful close and reports if a save prompt keeps the window alive.

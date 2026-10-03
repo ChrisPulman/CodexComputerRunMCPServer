@@ -25,10 +25,30 @@ internal static class KeyboardInput
     /// </summary>
     public const byte VKey = 0x56;
 
+    public const byte VolumeMuteKey = 0xAD;
+
+    public const byte VolumeDownKey = 0xAE;
+
+    public const byte VolumeUpKey = 0xAF;
+
+    public const byte MediaNextTrackKey = 0xB0;
+
+    public const byte MediaPreviousTrackKey = 0xB1;
+
+    public const byte MediaStopKey = 0xB2;
+
+    public const byte MediaPlayPauseKey = 0xB3;
+
     /// <summary>
     /// Lookup table of named key tokens (for example, <c>enter</c> or <c>f5</c>) to virtual-key codes.
     /// </summary>
     private static readonly IReadOnlyDictionary<string, byte> NamedVirtualKeys = CreateVirtualKeyMap();
+
+    /// <summary>
+    /// Returns whether a virtual key is a system media or volume control.
+    /// </summary>
+    public static bool IsMediaKey(byte virtualKey)
+        => virtualKey is >= VolumeMuteKey and <= MediaPlayPauseKey;
 
     /// <summary>
     /// Splits a hotkey expression into key tokens.
@@ -197,6 +217,13 @@ internal static class KeyboardInput
             ["divide"] = 0x6F,
             ["numlock"] = 0x90,
             ["scrolllock"] = 0x91,
+            ["volume_mute"] = VolumeMuteKey,
+            ["volume_down"] = VolumeDownKey,
+            ["volume_up"] = VolumeUpKey,
+            ["media_next_track"] = MediaNextTrackKey,
+            ["media_previous_track"] = MediaPreviousTrackKey,
+            ["media_stop"] = MediaStopKey,
+            ["media_play_pause"] = MediaPlayPauseKey,
         };
 
         for (var i = 1; i <= 24; i++)

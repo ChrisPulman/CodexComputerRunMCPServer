@@ -121,6 +121,11 @@ internal sealed class MacComputerRunPlatform(IExternalCommandRunner? commandRunn
             throw new ArgumentException("At least one key is required.", nameof(virtualKeys));
         }
 
+        if (virtualKeys.Any(KeyboardInput.IsMediaKey))
+        {
+            throw new PlatformNotSupportedException("Global media and volume keys are not supported by the built-in macOS adapter.");
+        }
+
         RunAppleScript(CreateKeyCodeScript(virtualKeys));
     }
 

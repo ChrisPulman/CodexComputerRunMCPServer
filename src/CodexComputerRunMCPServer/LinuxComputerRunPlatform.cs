@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Drawing;
+using System.Globalization;
 
 namespace CodexComputerRunMCPServer;
 
@@ -9,6 +10,8 @@ namespace CodexComputerRunMCPServer;
 internal sealed class LinuxComputerRunPlatform : ExternalCommandPlatform, IComputerRunPlatform
 {
     private readonly bool _isWaylandSession;
+    private readonly Dictionary<long, string> _wdotoolWindowIds = [];
+    private readonly object _wdotoolWindowIdsLock = new();
     private Rectangle? _lastWaylandVirtualScreenBounds;
 
     public LinuxComputerRunPlatform(IExternalCommandRunner? commandRunner = null, bool? waylandSession = null)
@@ -194,7 +197,7 @@ internal sealed class LinuxComputerRunPlatform : ExternalCommandPlatform, ICompu
         var windowId = $"0x{handle:X}";
         if (_isWaylandSession && CommandRunner.CommandExists("wdotool"))
         {
-            _ = RunRequired("wdotool", ["windowactivate", handle.ToString()]);
+            _ = RunRequired("wdotool", ["windowactivate", ResolveWdotoolWindowId(handle)]);
             return;
         }
 
@@ -219,7 +222,7 @@ internal sealed class LinuxComputerRunPlatform : ExternalCommandPlatform, ICompu
         var windowId = $"0x{handle:X}";
         if (_isWaylandSession && CommandRunner.CommandExists("wdotool"))
         {
-            _ = RunRequired("wdotool", ["windowclose", handle.ToString()]);
+            _ = RunRequired("wdotool", ["windowclose", ResolveWdotoolWindowId(handle)]);
             return;
         }
 
@@ -475,26 +478,74 @@ internal sealed class LinuxComputerRunPlatform : ExternalCommandPlatform, ICompu
 
     private IReadOnlyList<WindowInfo> ListWindowsWithWdotool(int limit)
     {
-        var ids = RunRequired("wdotool", ["search", "--name", ".", "--regex"]).StandardOutputText
+        var rows = RunRequired("wdotool", ["search", "--name", ".", "--regex"]).StandardOutputText
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Take(limit)
             .ToArray();
-        var windows = new List<WindowInfo>(ids.Length);
+        var windows = new List<WindowInfo>(rows.Length);
 
-        foreach (var id in ids)
+        foreach (var row in rows)
         {
+            // wdotool search prints "<id>\\t<title>". On the wlr backend,
+            // <id> is an opaque Wayland object name such as
+            // "zwlr_foreign_toplevel_handle_v1@4278190081", not a native
+            // integer handle. Keep that exact token for subsequent actions.
+            var id = row.Split('\t', 2)[0].Trim();
+            if (!TryParseWdotoolWindowHandle(id, out var handle))
+            {
+                continue;
+            }
+
             var title = RunRequired("wdotool", ["getwindowname", id]).StandardOutputText.Trim();
-            var pidText = RunRequired("wdotool", ["getwindowpid", id]).StandardOutputText.Trim();
-            var handle = long.TryParse(id, out var parsedHandle) ? parsedHandle : 0;
-            var pid = int.TryParse(pidText, out var parsedPid) ? parsedPid : 0;
+            // Some Wayland compositors don't publish a PID through
+            // zwlr_foreign_toplevel_handle_v1. wdotool reports that as a
+            // non-zero exit code; the title and window actions still work.
+            var pidResult = CommandRunner.Run("wdotool", ["getwindowpid", id]);
+            var pid = pidResult.ExitCode == 0
+                && int.TryParse(pidResult.StandardOutputText.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPid)
+                    ? parsedPid
+                    : 0;
 
             if (!string.IsNullOrWhiteSpace(title))
             {
+                lock (_wdotoolWindowIdsLock)
+                {
+                    _wdotoolWindowIds[handle] = id;
+                }
+
                 windows.Add(new WindowInfo(handle, pid, TryReadProcessName(pid), title));
             }
         }
 
         return windows;
+    }
+
+    private string ResolveWdotoolWindowId(long handle)
+    {
+        lock (_wdotoolWindowIdsLock)
+        {
+            return _wdotoolWindowIds.TryGetValue(handle, out var id)
+                ? id
+                : handle.ToString(CultureInfo.InvariantCulture);
+        }
+    }
+
+    private static bool TryParseWdotoolWindowHandle(string id, out long handle)
+    {
+        if (long.TryParse(id, NumberStyles.Integer, CultureInfo.InvariantCulture, out handle))
+        {
+            return handle > 0;
+        }
+
+        var separator = id.LastIndexOf('@');
+        if (separator >= 0
+            && long.TryParse(id.AsSpan(separator + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out handle))
+        {
+            return handle > 0;
+        }
+
+        handle = 0;
+        return false;
     }
 
     private bool TrySetClipboardText(string text)

@@ -108,9 +108,9 @@ public static class ComputerRunTools
     /// <param name="delay">Optional post-action delay in seconds.</param>
     /// <returns>A JSON status string returned by the runtime service.</returns>
     [McpServerTool]
-    [Description("Press a single keyboard key, for example enter, tab, escape, f5, a, A, ?, or 1.")]
+    [Description("Press a single keyboard key, for example enter, tab, escape, f5, a, A, ?, or 1. Global media keys include media_play_pause, media_next_track, media_previous_track, media_stop, volume_mute, volume_down, and volume_up; omit target_handle for global media control.")]
     public static string press_key(
-        [Description("Key name or single character.")] string key,
+        [Description("Key name or single character. Also accepts media_play_pause, media_next_track, media_previous_track, media_stop, volume_mute, volume_down, and volume_up for global media control.")] string key,
         [Description("How long to hold the key, in seconds.")] double duration = 0.03,
         [Description("Optional delay after the action, in seconds.")] double? delay = null,
         [Description("Optional native window handle previously returned by find_windows. When supplied, input is aborted unless that exact window is still foreground.")] long? target_handle = null)

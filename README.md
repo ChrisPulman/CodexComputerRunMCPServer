@@ -61,6 +61,8 @@ Wayland sessions are detected from `XDG_SESSION_TYPE=wayland` or `WAYLAND_DISPLA
 
 Compositors control which desktop information they expose. `cursor_position` reports an actionable unsupported error when the compositor does not provide the global pointer position; `move_mouse` still moves to its target and falls back to a direct move when it cannot query a starting point. On GNOME, `wdotool` window discovery and other window controls require its companion Shell extension; its portal input backend may show a first-use permission prompt. Screenshot bounds are derived from the captured PNG when compositor geometry is unavailable. Exact rectangular screenshots require `grim`; GNOME Screenshot and Spectacle are used for full-desktop capture. Multi-monitor Wayland coordinate layouts have not been verified; screenshot bounds are currently reported from image size at origin `(0, 0)`.
 
+Some Wayland backends do not expose a process ID for each window. In that case, window discovery, title matching, activation, and closing still work; process-name filters cannot match those windows.
+
 ## Codex Protocol
 
 When this server is active, agents should follow this operating protocol:
@@ -172,14 +174,14 @@ Scrolls the mouse wheel.
 
 ### `press_key`
 
-Presses one keyboard key.
+Presses one keyboard key. On Windows and Linux, named system media and volume keys can control the active media session without focusing its window.
 
 **Parameters:**
-- `key` - key name or single character, for example `enter`, `tab`, `escape`, `f5`, `a`, `A`, `?`, or `1`.
+- `key` - key name or single character, for example `enter`, `tab`, `escape`, `f5`, `a`, `A`, `?`, or `1`. Media keys: `media_play_pause`, `media_next_track`, `media_previous_track`, and `media_stop`. Volume keys: `volume_mute`, `volume_down`, and `volume_up`.
 - `duration` *(default: `0.03`)* - seconds to hold the key.
 - `delay` *(optional)* - seconds to wait after the action.
 
-**When to use:** Use for navigation keys, function keys, confirm/cancel actions, and single-character shortcuts.
+**When to use:** Use for navigation keys, function keys, confirm/cancel actions, and single-character shortcuts. For global media and volume controls, omit `target_handle`; Windows sends the system media key and Linux maps it to the corresponding `XF86Audio*` key. The built-in macOS adapter reports an explicit unsupported-platform error for these keys.
 
 ---
 
@@ -311,7 +313,7 @@ Requests a graceful close for one exact top-level window handle. The operation p
 
 ### Targeted desktop input
 
-`move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text` accept an optional `target_handle`. When supplied, the server re-enumerates that exact window immediately before input and sends nothing if it is missing or minimized; clicks, scrolling, and keyboard input additionally require it to be foreground. This turns a focus race into a safe, actionable error. The recommended sequence is `find_windows` → `activate_window` → input with `target_handle`.
+`move_mouse`, `click`, `scroll`, `press_key`, `hotkey`, and `type_text` accept an optional `target_handle`. When supplied, the server re-enumerates that exact window immediately before input and sends nothing if it is missing or minimized; clicks, scrolling, and keyboard input additionally require it to be foreground. This turns a focus race into a safe, actionable error. The recommended sequence is `find_windows` → `activate_window` → input with `target_handle`. Global media and volume keys intentionally act on the system's media session, so leave `target_handle` unset for those.
 
 ---
 

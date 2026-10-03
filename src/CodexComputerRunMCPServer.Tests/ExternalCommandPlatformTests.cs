@@ -121,6 +121,21 @@ public class ExternalCommandPlatformTests
     }
 
     [Test]
+    public async Task LinuxPlatform_PressKeyUsesSystemMediaKeysyms()
+    {
+        var runner = new RecordingCommandRunner("xdotool");
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
+
+        platform.PressKey([KeyboardInput.MediaNextTrackKey], TimeSpan.Zero);
+        platform.PressKey([KeyboardInput.MediaPreviousTrackKey], TimeSpan.Zero);
+        platform.PressKey([KeyboardInput.MediaPlayPauseKey], TimeSpan.Zero);
+        platform.PressKey([KeyboardInput.VolumeDownKey], TimeSpan.Zero);
+
+        await Assert.That(string.Join("|", runner.Invocations.Select(call => call.ArgumentText)))
+            .IsEqualTo("key --clearmodifiers XF86AudioNext|key --clearmodifiers XF86AudioPrev|key --clearmodifiers XF86AudioPlay|key --clearmodifiers XF86AudioLowerVolume");
+    }
+
+    [Test]
     public async Task LinuxPlatform_TextEntryUsesClipboardThenControlV()
     {
         var runner = new RecordingCommandRunner("wl-copy", "xdotool");
@@ -263,6 +278,36 @@ public class ExternalCommandPlatformTests
         await Assert.That(runner.Invocations.All(call => call.FileName == "wdotool")).IsTrue();
         await Assert.That(runner.Invocations.Any(call => call.ArgumentText == "windowactivate 101")).IsTrue();
         await Assert.That(runner.Invocations.Any(call => call.ArgumentText == "windowclose 101")).IsTrue();
+    }
+
+    [Test]
+    public async Task LinuxWaylandPlatform_ParsesWdotoolSearchRowsAndToleratesUnavailablePid()
+    {
+        const string wdotoolId = "zwlr_foreign_toplevel_handle_v1@4278190081";
+        var runner = new RecordingCommandRunner("wdotool")
+        {
+            OnRun = invocation => invocation.ArgumentText switch
+            {
+                "search --name . --regex" => RecordingCommandRunner.Text($"{wdotoolId}\t137 Discord\n"),
+                $"getwindowname {wdotoolId}" => RecordingCommandRunner.Text("137 Discord\n"),
+                $"getwindowpid {wdotoolId}" => RecordingCommandRunner.Result(1, string.Empty, "pid not available"),
+                _ => RecordingCommandRunner.Text(string.Empty),
+            },
+        };
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: true);
+
+        var windows = platform.ListWindows(5);
+        platform.ActivateWindow(4_278_190_081, restore: true);
+        platform.RequestCloseWindow(4_278_190_081);
+
+        await Assert.That(windows.Count).IsEqualTo(1);
+        await Assert.That(windows[0].Handle).IsEqualTo(4_278_190_081);
+        await Assert.That(windows[0].ProcessId).IsEqualTo(0);
+        await Assert.That(windows[0].ProcessName).IsNull();
+        await Assert.That(windows[0].Title).IsEqualTo("137 Discord");
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == $"getwindowname {wdotoolId}")).IsTrue();
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == $"windowactivate {wdotoolId}")).IsTrue();
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == $"windowclose {wdotoolId}")).IsTrue();
     }
 
     [Test]
@@ -440,6 +485,18 @@ public class ExternalCommandPlatformTests
 
         await Assert.That(runner.Invocations[0].Arguments[1])
             .Contains("key code 37 using {command down, shift down}");
+    }
+
+    [Test]
+    public async Task MacPlatform_GlobalMediaKeysFailWithAnActionableError()
+    {
+        var runner = new RecordingCommandRunner("osascript");
+        var platform = new MacComputerRunPlatform(runner);
+
+        await Assert.That(() => platform.PressKey([KeyboardInput.MediaNextTrackKey], TimeSpan.Zero))
+            .Throws<PlatformNotSupportedException>()
+            .WithMessageContaining("Global media and volume keys");
+        await Assert.That(runner.Invocations.Count).IsEqualTo(0);
     }
 
     [Test]
