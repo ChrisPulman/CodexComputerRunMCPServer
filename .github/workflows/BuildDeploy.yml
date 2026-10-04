@@ -217,6 +217,22 @@ jobs:
       CERTUM_OTP_URI: ${{ secrets.CERTUM_OTP_URI }}
       CERTUM_CERT_FINGERPRINT: ${{ secrets.CERTUM_CERT_FINGERPRINT }}
     steps:
+      - name: Install signing Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The signer uses Ubuntu 26.04; install its native interpreter inside the container.
+          apt-get update
+          apt-get install -y --no-install-recommends python3.14
+
+      - name: Verify signing Python
+        shell: bash
+        env:
+          SIGNING_PYTHON: /usr/bin/python3.14
+        run: |
+          set -euo pipefail
+          "$SIGNING_PYTHON" -c 'import sys,base64,hashlib,hmac,struct,time;from urllib.parse import urlparse,parse_qs;print(sys.executable);print(sys.version);sys.exit(0 if sys.version_info[:2] == (3,14) else "Signing requires Python 3.14")'
+
       - name: Download unsigned packages
         uses: actions/download-artifact@v8
         with:
@@ -251,6 +267,7 @@ jobs:
         shell: bash
         env:
           DISPLAY: ':99'
+          SIGNING_PYTHON: /usr/bin/python3.14
         run: |
           set -euo pipefail
           : "${CERTUM_USER_ID:?map the CERTUM_USER_ID secret into the job env}"
@@ -274,7 +291,7 @@ jobs:
           fi
           sleep 20
 
-          OTP="$(python3 -c 'import os,hmac,hashlib,base64,struct,time;from urllib.parse import urlparse,parse_qs;q=parse_qs(urlparse(os.environ["CERTUM_OTP_URI"]).query);s=q["secret"][0];digits=int(q.get("digits",["6"])[0]);period=int(q.get("period",["30"])[0]);algo={"SHA1":hashlib.sha1,"SHA256":hashlib.sha256,"SHA512":hashlib.sha512}[q.get("algorithm",["SHA1"])[0].upper()];key=base64.b32decode(s+"="*((8-len(s)%8)%8));h=hmac.new(key,struct.pack(">Q",int(time.time()//period)),algo).digest();o=h[-1]&0xF;print(str((int.from_bytes(h[o:o+4],"big")&0x7fffffff)%(10**digits)).zfill(digits))')"
+          OTP="$("$SIGNING_PYTHON" -c 'import os,hmac,hashlib,base64,struct,time;from urllib.parse import urlparse,parse_qs;q=parse_qs(urlparse(os.environ["CERTUM_OTP_URI"]).query);s=q["secret"][0];digits=int(q.get("digits",["6"])[0]);period=int(q.get("period",["30"])[0]);algo={"SHA1":hashlib.sha1,"SHA256":hashlib.sha256,"SHA512":hashlib.sha512}[q.get("algorithm",["SHA1"])[0].upper()];key=base64.b32decode(s+"="*((8-len(s)%8)%8));h=hmac.new(key,struct.pack(">Q",int(time.time()//period)),algo).digest();o=h[-1]&0xF;print(str((int.from_bytes(h[o:o+4],"big")&0x7fffffff)%(10**digits)).zfill(digits))')"
           echo "::add-mask::$OTP"
 
           WID=""; BX=0; BY=0; BW=0; BH=0
