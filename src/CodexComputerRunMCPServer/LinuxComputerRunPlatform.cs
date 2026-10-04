@@ -1,19 +1,40 @@
+using System.Buffers.Binary;
 using System.Drawing;
+using System.Globalization;
 
 namespace CodexComputerRunMCPServer;
 
 /// <summary>
 /// Linux implementation backed by common desktop automation commands.
 /// </summary>
-internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRunner = null)
-    : ExternalCommandPlatform(commandRunner), IComputerRunPlatform
+internal sealed class LinuxComputerRunPlatform : ExternalCommandPlatform, IComputerRunPlatform
 {
+    private readonly bool _isWaylandSession;
+    private readonly Dictionary<long, string> _wdotoolWindowIds = [];
+    private readonly object _wdotoolWindowIdsLock = new();
+    private Rectangle? _lastWaylandVirtualScreenBounds;
+
+    public LinuxComputerRunPlatform(IExternalCommandRunner? commandRunner = null, bool? waylandSession = null)
+        : base(commandRunner)
+    {
+        _isWaylandSession = waylandSession ??
+            string.Equals(Environment.GetEnvironmentVariable("XDG_SESSION_TYPE"), "wayland", StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
+    }
+
     /// <inheritdoc />
     public string PlatformName => "Linux";
 
     /// <inheritdoc />
     public Rectangle GetVirtualScreenBounds()
     {
+        if (_isWaylandSession)
+        {
+            var png = CaptureViaTempFile(CaptureFullScreenshot);
+            _lastWaylandVirtualScreenBounds = GetPngBounds(png);
+            return _lastWaylandVirtualScreenBounds.Value;
+        }
+
         if (CommandRunner.CommandExists("xdotool"))
         {
             var output = RunRequired("xdotool", ["getdisplaygeometry"]).StandardOutputText;
@@ -56,11 +77,49 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
     }
 
     /// <inheritdoc />
-    public byte[] CapturePng(Rectangle bounds) => CaptureViaTempFile(path => SaveScreenshotPng(bounds, path));
+    public byte[] CapturePng(Rectangle bounds, bool highlightCursor = true) => CaptureViaTempFile(path => SaveScreenshotPng(bounds, path, highlightCursor));
 
     /// <inheritdoc />
-    public void SaveScreenshotPng(Rectangle bounds, string path)
+    public void SaveScreenshotPng(Rectangle bounds, string path, bool highlightCursor = true)
     {
+        if (_isWaylandSession)
+        {
+            var isFullDesktop = _lastWaylandVirtualScreenBounds == bounds;
+            if (isFullDesktop && CurrentDesktopContains("KDE") && CommandRunner.CommandExists("spectacle"))
+            {
+                RunSpectacle(path);
+                return;
+            }
+
+            if (isFullDesktop && CurrentDesktopContains("GNOME") && CommandRunner.CommandExists("gnome-screenshot"))
+            {
+                _ = RunRequired("gnome-screenshot", ["-f", path]);
+                return;
+            }
+
+            if (CommandRunner.CommandExists("grim"))
+            {
+                _ = RunRequired("grim", ["-g", $"{bounds.X},{bounds.Y} {bounds.Width}x{bounds.Height}", path]);
+                return;
+            }
+
+            if (CommandRunner.CommandExists("gnome-screenshot"))
+            {
+                EnsureFullWaylandBounds(bounds, "gnome-screenshot");
+                _ = RunRequired("gnome-screenshot", ["-f", path]);
+                return;
+            }
+
+            if (CommandRunner.CommandExists("spectacle"))
+            {
+                EnsureFullWaylandBounds(bounds, "Spectacle");
+                RunSpectacle(path);
+                return;
+            }
+
+            throw MissingDependency("Linux Wayland", "grim (rectangular regions)", "gnome-screenshot", "spectacle");
+        }
+
         if (CommandRunner.CommandExists("gnome-screenshot"))
         {
             _ = RunRequired("gnome-screenshot", ["-f", path]);
@@ -84,12 +143,45 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
 
     /// <inheritdoc />
     public void MoveCursor(int x, int y)
-        => RunXdotool(["mousemove", "--sync", x.ToString(), y.ToString()]);
+        => RunPointerCommand(_isWaylandSession
+            ? ["mousemove", x.ToString(), y.ToString()]
+            : ["mousemove", "--sync", x.ToString(), y.ToString()]);
 
     /// <inheritdoc />
     public DesktopPoint GetCursorPosition()
     {
-        var output = RunXdotool(["getmouselocation", "--shell"]).StandardOutputText;
+        if (_isWaylandSession && CommandRunner.CommandExists("hyprctl"))
+        {
+            try
+            {
+                var cursorOutput = RunRequired("hyprctl", ["cursorpos"]).StandardOutputText.Trim();
+                var coordinates = cursorOutput.Split(',', StringSplitOptions.TrimEntries);
+                if (coordinates.Length == 2)
+                {
+                    return new DesktopPoint(ParseInt(coordinates[0], "X"), ParseInt(coordinates[1], "Y"));
+                }
+
+                throw new FormatException($"Could not parse Hyprland cursor position '{cursorOutput}'.");
+            }
+            catch (InvalidOperationException)
+            {
+                // hyprctl may be installed outside a Hyprland session; try wdotool next.
+            }
+        }
+
+        string output;
+        try
+        {
+            output = RunPointerCommand(["getmouselocation", "--shell"]).StandardOutputText;
+        }
+        catch (InvalidOperationException exception) when (_isWaylandSession)
+        {
+            throw new PlatformNotSupportedException(
+                "This Wayland compositor does not expose the current global cursor position. " +
+                "Pointer movement and clicking remain available, but cursor_position cannot be reported.",
+                exception);
+        }
+
         var values = output
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(line => line.Split('=', 2))
@@ -97,6 +189,56 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
             .ToDictionary(parts => parts[0], parts => parts[1], StringComparer.OrdinalIgnoreCase);
 
         return new DesktopPoint(ParseInt(values["X"], "X"), ParseInt(values["Y"], "Y"));
+    }
+
+    /// <inheritdoc />
+    public void ActivateWindow(long handle, bool restore)
+    {
+        var windowId = $"0x{handle:X}";
+        if (_isWaylandSession && CommandRunner.CommandExists("wdotool"))
+        {
+            _ = RunRequired("wdotool", ["windowactivate", ResolveWdotoolWindowId(handle)]);
+            return;
+        }
+
+        if (!_isWaylandSession && CommandRunner.CommandExists("wmctrl"))
+        {
+            _ = RunRequired("wmctrl", ["-ia", windowId]);
+            return;
+        }
+
+        if (!_isWaylandSession && CommandRunner.CommandExists("xdotool"))
+        {
+            _ = RunPointerCommand(["windowactivate", "--sync", handle.ToString()]);
+            return;
+        }
+
+        throw MissingWindowDependency();
+    }
+
+    /// <inheritdoc />
+    public void RequestCloseWindow(long handle)
+    {
+        var windowId = $"0x{handle:X}";
+        if (_isWaylandSession && CommandRunner.CommandExists("wdotool"))
+        {
+            _ = RunRequired("wdotool", ["windowclose", ResolveWdotoolWindowId(handle)]);
+            return;
+        }
+
+        if (!_isWaylandSession && CommandRunner.CommandExists("wmctrl"))
+        {
+            _ = RunRequired("wmctrl", ["-ic", windowId]);
+            return;
+        }
+
+        if (!_isWaylandSession && CommandRunner.CommandExists("xdotool"))
+        {
+            _ = RunPointerCommand(["windowclose", handle.ToString()]);
+            return;
+        }
+
+        throw MissingWindowDependency();
     }
 
     /// <inheritdoc />
@@ -110,7 +252,21 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
             _ => throw new ArgumentOutOfRangeException(nameof(button), button, "Unknown mouse button."),
         };
 
-        RunXdotool([
+        if (_isWaylandSession)
+        {
+            for (var index = 0; index < Math.Max(1, clicks); index++)
+            {
+                RunPointerCommand(["click", buttonNumber]);
+                if (index + 1 < clicks && interval > TimeSpan.Zero)
+                {
+                    Thread.Sleep(interval);
+                }
+            }
+
+            return;
+        }
+
+        RunPointerCommand([
             "click",
             "--repeat",
             Math.Max(1, clicks).ToString(),
@@ -128,8 +284,14 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
             return;
         }
 
+        if (_isWaylandSession)
+        {
+            RunPointerCommand(["scroll", "0", (-amount).ToString()]);
+            return;
+        }
+
         var button = amount > 0 ? "4" : "5";
-        RunXdotool(["click", "--repeat", Math.Abs(amount).ToString(), button]);
+        RunPointerCommand(["click", "--repeat", Math.Abs(amount).ToString(), button]);
     }
 
     /// <inheritdoc />
@@ -144,14 +306,14 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
         var names = keyChord.Select(ExternalKeyNames.ToXdotoolName).ToArray();
         foreach (var name in names)
         {
-            RunXdotool(["keydown", name]);
+            RunPointerCommand(["keydown", name]);
         }
 
         Thread.Sleep(duration);
 
         foreach (var name in names.Reverse())
         {
-            RunXdotool(["keyup", name]);
+            RunPointerCommand(["keyup", name]);
         }
     }
 
@@ -164,11 +326,11 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
         }
 
         var chord = string.Join('+', virtualKeys.Select(ExternalKeyNames.ToXdotoolName));
-        RunXdotool(["key", "--clearmodifiers", chord]);
+        RunPointerCommand(["key", "--clearmodifiers", chord]);
     }
 
     /// <inheritdoc />
-    public void PasteText(string text)
+    public void TypeText(string text)
     {
         if (TrySetClipboardText(text))
         {
@@ -176,42 +338,214 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
             return;
         }
 
-        if (CommandRunner.CommandExists("xdotool"))
+        if (_isWaylandSession && CommandRunner.CommandExists("wdotool"))
         {
-            RunXdotool(["type", "--clearmodifiers", "--delay", "0", "--", text]);
+            RunRequired("wdotool", ["type", "--clearmodifiers", "--", text]);
             return;
         }
 
-        throw MissingDependency(PlatformName, "wl-copy", "xclip", "xsel", "xdotool");
+        if (!_isWaylandSession && CommandRunner.CommandExists("xdotool"))
+        {
+            RunPointerCommand(["type", "--clearmodifiers", "--delay", "0", "--", text]);
+            return;
+        }
+
+        throw MissingDependency(_isWaylandSession ? "Linux Wayland" : PlatformName,
+            "wl-copy", "xclip", "xsel", _isWaylandSession ? "wdotool" : "xdotool");
     }
 
     /// <inheritdoc />
     public IReadOnlyList<WindowInfo> ListWindows(int limit)
     {
-        if (CommandRunner.CommandExists("wmctrl"))
+        if (_isWaylandSession && CommandRunner.CommandExists("wdotool"))
+        {
+            return ListWindowsWithWdotool(limit);
+        }
+
+        if (!_isWaylandSession && CommandRunner.CommandExists("wmctrl"))
         {
             return ListWindowsWithWmctrl(limit);
         }
 
-        if (CommandRunner.CommandExists("xdotool"))
+        if (!_isWaylandSession && CommandRunner.CommandExists("xdotool"))
         {
             return ListWindowsWithXdotool(limit);
         }
 
-        throw MissingDependency(PlatformName, "wmctrl", "xdotool");
+        throw MissingWindowDependency();
     }
 
     /// <inheritdoc />
     public short KeyScan(char character) => KeyboardInputDefaults.KeyScan(character);
 
-    private ExternalCommandResult RunXdotool(IReadOnlyList<string> arguments)
+    private ExternalCommandResult RunPointerCommand(IReadOnlyList<string> arguments)
     {
-        if (!CommandRunner.CommandExists("xdotool"))
+        var command = _isWaylandSession ? "wdotool" : "xdotool";
+        if (!CommandRunner.CommandExists(command))
         {
-            throw MissingDependency(PlatformName, "xdotool");
+            throw MissingDependency(_isWaylandSession ? "Linux Wayland" : PlatformName, command);
         }
 
-        return RunRequired("xdotool", arguments);
+        return RunRequired(command, arguments);
+    }
+
+    private PlatformNotSupportedException MissingWindowDependency()
+        => _isWaylandSession
+            ? MissingDependency("Linux Wayland", "wdotool")
+            : MissingDependency(PlatformName, "wmctrl", "xdotool");
+
+    private void CaptureFullScreenshot(string path)
+    {
+        if (_isWaylandSession && CurrentDesktopContains("KDE") && CommandRunner.CommandExists("spectacle"))
+        {
+            RunSpectacle(path);
+            return;
+        }
+
+        if (_isWaylandSession && CurrentDesktopContains("GNOME") && CommandRunner.CommandExists("gnome-screenshot"))
+        {
+            _ = RunRequired("gnome-screenshot", ["-f", path]);
+            return;
+        }
+
+        if (CommandRunner.CommandExists("grim"))
+        {
+            _ = RunRequired("grim", [path]);
+            return;
+        }
+
+        if (CommandRunner.CommandExists("gnome-screenshot"))
+        {
+            _ = RunRequired("gnome-screenshot", ["-f", path]);
+            return;
+        }
+
+        if (CommandRunner.CommandExists("spectacle"))
+        {
+            RunSpectacle(path);
+            return;
+        }
+
+        if (!_isWaylandSession && CommandRunner.CommandExists("import"))
+        {
+            _ = RunRequired("import", ["-window", "root", path]);
+            return;
+        }
+
+        throw MissingDependency(_isWaylandSession ? "Linux Wayland" : PlatformName,
+            "grim", "gnome-screenshot", "spectacle", "import (X11 only)");
+    }
+
+    private void EnsureFullWaylandBounds(Rectangle bounds, string captureTool)
+    {
+        var fullBounds = _lastWaylandVirtualScreenBounds ?? GetVirtualScreenBounds();
+        if (bounds != fullBounds)
+        {
+            throw new PlatformNotSupportedException(
+                $"{captureTool} can capture the full Wayland desktop but cannot capture an exact region. " +
+                "Install grim for rectangular screenshot requests.");
+        }
+    }
+
+    private void RunSpectacle(string path)
+        => _ = RunRequired("spectacle", ["--background", "--nonotify", "--output", path]);
+
+    private static bool CurrentDesktopContains(string name)
+    {
+        var desktop = string.Join(':',
+            Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP"),
+            Environment.GetEnvironmentVariable("XDG_SESSION_DESKTOP"));
+        return desktop.Contains(name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Rectangle GetPngBounds(byte[] png)
+    {
+        ReadOnlySpan<byte> signature = [137, 80, 78, 71, 13, 10, 26, 10];
+        if (png.Length < 24 || !png.AsSpan(0, signature.Length).SequenceEqual(signature))
+        {
+            throw new InvalidDataException("The desktop capture command did not produce a valid PNG image.");
+        }
+
+        var width = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(16, 4));
+        var height = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(20, 4));
+        if (width <= 0 || height <= 0)
+        {
+            throw new InvalidDataException($"The desktop capture returned invalid PNG dimensions {width}x{height}.");
+        }
+
+        return new Rectangle(0, 0, width, height);
+    }
+
+    private IReadOnlyList<WindowInfo> ListWindowsWithWdotool(int limit)
+    {
+        var rows = RunRequired("wdotool", ["search", "--name", ".", "--regex"]).StandardOutputText
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(limit)
+            .ToArray();
+        var windows = new List<WindowInfo>(rows.Length);
+
+        foreach (var row in rows)
+        {
+            // wdotool search prints "<id>\\t<title>". On the wlr backend,
+            // <id> is an opaque Wayland object name such as
+            // "zwlr_foreign_toplevel_handle_v1@4278190081", not a native
+            // integer handle. Keep that exact token for subsequent actions.
+            var id = row.Split('\t', 2)[0].Trim();
+            if (!TryParseWdotoolWindowHandle(id, out var handle))
+            {
+                continue;
+            }
+
+            var title = RunRequired("wdotool", ["getwindowname", id]).StandardOutputText.Trim();
+            // Some Wayland compositors don't publish a PID through
+            // zwlr_foreign_toplevel_handle_v1. wdotool reports that as a
+            // non-zero exit code; the title and window actions still work.
+            var pidResult = CommandRunner.Run("wdotool", ["getwindowpid", id]);
+            var pid = pidResult.ExitCode == 0
+                && int.TryParse(pidResult.StandardOutputText.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPid)
+                    ? parsedPid
+                    : 0;
+
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                lock (_wdotoolWindowIdsLock)
+                {
+                    _wdotoolWindowIds[handle] = id;
+                }
+
+                windows.Add(new WindowInfo(handle, pid, TryReadProcessName(pid), title));
+            }
+        }
+
+        return windows;
+    }
+
+    private string ResolveWdotoolWindowId(long handle)
+    {
+        lock (_wdotoolWindowIdsLock)
+        {
+            return _wdotoolWindowIds.TryGetValue(handle, out var id)
+                ? id
+                : handle.ToString(CultureInfo.InvariantCulture);
+        }
+    }
+
+    private static bool TryParseWdotoolWindowHandle(string id, out long handle)
+    {
+        if (long.TryParse(id, NumberStyles.Integer, CultureInfo.InvariantCulture, out handle))
+        {
+            return handle > 0;
+        }
+
+        var separator = id.LastIndexOf('@');
+        if (separator >= 0
+            && long.TryParse(id.AsSpan(separator + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out handle))
+        {
+            return handle > 0;
+        }
+
+        handle = 0;
+        return false;
     }
 
     private bool TrySetClipboardText(string text)
@@ -269,7 +603,7 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
 
     private IReadOnlyList<WindowInfo> ListWindowsWithXdotool(int limit)
     {
-        var ids = RunXdotool(["search", "--onlyvisible", "--name", "."]).StandardOutputText
+        var ids = RunPointerCommand(["search", "--onlyvisible", "--name", "."]).StandardOutputText
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Take(limit)
             .ToArray();
@@ -277,8 +611,8 @@ internal sealed class LinuxComputerRunPlatform(IExternalCommandRunner? commandRu
 
         foreach (var id in ids)
         {
-            var title = RunXdotool(["getwindowname", id]).StandardOutputText.Trim();
-            var pidText = RunXdotool(["getwindowpid", id]).StandardOutputText.Trim();
+            var title = RunPointerCommand(["getwindowname", id]).StandardOutputText.Trim();
+            var pidText = RunPointerCommand(["getwindowpid", id]).StandardOutputText.Trim();
             var handle = long.TryParse(id, out var parsedHandle) ? parsedHandle : 0;
             var pid = int.TryParse(pidText, out var parsedPid) ? parsedPid : 0;
 

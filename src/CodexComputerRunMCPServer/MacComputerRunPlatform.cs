@@ -32,10 +32,10 @@ internal sealed class MacComputerRunPlatform(IExternalCommandRunner? commandRunn
     }
 
     /// <inheritdoc />
-    public byte[] CapturePng(Rectangle bounds) => CaptureViaTempFile(path => SaveScreenshotPng(bounds, path));
+    public byte[] CapturePng(Rectangle bounds, bool highlightCursor = true) => CaptureViaTempFile(path => SaveScreenshotPng(bounds, path, highlightCursor));
 
     /// <inheritdoc />
-    public void SaveScreenshotPng(Rectangle bounds, string path)
+    public void SaveScreenshotPng(Rectangle bounds, string path, bool highlightCursor = true)
     {
         if (!CommandRunner.CommandExists("screencapture"))
         {
@@ -60,6 +60,16 @@ internal sealed class MacComputerRunPlatform(IExternalCommandRunner? commandRunn
 
         return new DesktopPoint(ParseInt(parts[0], "x"), ParseInt(parts[1], "y"));
     }
+
+    /// <inheritdoc />
+    public void ActivateWindow(long handle, bool restore)
+        => throw new PlatformNotSupportedException(
+            "macOS window enumeration does not expose a stable native handle for activation in this adapter.");
+
+    /// <inheritdoc />
+    public void RequestCloseWindow(long handle)
+        => throw new PlatformNotSupportedException(
+            "macOS window enumeration does not expose a stable native handle for graceful close in this adapter.");
 
     /// <inheritdoc />
     public void Click(MouseButton button, int clicks, TimeSpan interval)
@@ -111,11 +121,16 @@ internal sealed class MacComputerRunPlatform(IExternalCommandRunner? commandRunn
             throw new ArgumentException("At least one key is required.", nameof(virtualKeys));
         }
 
+        if (virtualKeys.Any(KeyboardInput.IsMediaKey))
+        {
+            throw new PlatformNotSupportedException("Global media and volume keys are not supported by the built-in macOS adapter.");
+        }
+
         RunAppleScript(CreateKeyCodeScript(virtualKeys));
     }
 
     /// <inheritdoc />
-    public void PasteText(string text)
+    public void TypeText(string text)
     {
         if (!CommandRunner.CommandExists("pbcopy"))
         {

@@ -41,6 +41,30 @@ public class InputParsingTests
     }
 
     [Test]
+    public async Task ResolveKeyChord_RecognizesSystemMediaAndVolumeKeys()
+    {
+        var keys = new (string Name, byte VirtualKey)[]
+        {
+            ("volume_mute", KeyboardInput.VolumeMuteKey),
+            ("volume_down", KeyboardInput.VolumeDownKey),
+            ("volume_up", KeyboardInput.VolumeUpKey),
+            ("media_next_track", KeyboardInput.MediaNextTrackKey),
+            ("media_previous_track", KeyboardInput.MediaPreviousTrackKey),
+            ("media_stop", KeyboardInput.MediaStopKey),
+            ("media_play_pause", KeyboardInput.MediaPlayPauseKey),
+        };
+
+        foreach (var (name, virtualKey) in keys)
+        {
+            var chord = KeyboardInput.ResolveKeyChord(name, _ => -1);
+
+            await Assert.That(chord.Length).IsEqualTo(1);
+            await Assert.That(chord[0]).IsEqualTo(virtualKey);
+            await Assert.That(KeyboardInput.IsMediaKey(virtualKey)).IsTrue();
+        }
+    }
+
+    [Test]
     public async Task MouseButtonParser_AcceptsAllSupportedButtons()
     {
         await Assert.That(MouseButtonParser.Parse("left")).IsEqualTo(MouseButton.Left);

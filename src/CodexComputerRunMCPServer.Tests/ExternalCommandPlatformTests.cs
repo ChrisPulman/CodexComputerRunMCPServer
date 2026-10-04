@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text;
 
 namespace CodexComputerRunMCPServer.Tests;
@@ -37,7 +38,7 @@ public class ExternalCommandPlatformTests
                 return RecordingCommandRunner.Text(string.Empty);
             }
         };
-        var platform = new LinuxComputerRunPlatform(runner);
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
 
         try
         {
@@ -63,7 +64,7 @@ public class ExternalCommandPlatformTests
         {
             OnRun = _ => RecordingCommandRunner.Text("Screen 0: minimum 8 x 8, current 1920 x 1080, maximum 32767 x 32767\n")
         };
-        var platform = new LinuxComputerRunPlatform(runner);
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
 
         var bounds = platform.GetVirtualScreenBounds();
 
@@ -82,7 +83,7 @@ public class ExternalCommandPlatformTests
                 return RecordingCommandRunner.Text(string.Empty);
             }
         };
-        var platform = new LinuxComputerRunPlatform(runner);
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
 
         var bytes = platform.CapturePng(new(0, 0, 10, 10));
 
@@ -100,7 +101,7 @@ public class ExternalCommandPlatformTests
                 _ => RecordingCommandRunner.Text(string.Empty),
             }
         };
-        var platform = new LinuxComputerRunPlatform(runner);
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
 
         platform.MoveCursor(3, 4);
         var position = platform.GetCursorPosition();
@@ -120,12 +121,27 @@ public class ExternalCommandPlatformTests
     }
 
     [Test]
-    public async Task LinuxPlatform_PasteUsesClipboardThenControlV()
+    public async Task LinuxPlatform_PressKeyUsesSystemMediaKeysyms()
+    {
+        var runner = new RecordingCommandRunner("xdotool");
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
+
+        platform.PressKey([KeyboardInput.MediaNextTrackKey], TimeSpan.Zero);
+        platform.PressKey([KeyboardInput.MediaPreviousTrackKey], TimeSpan.Zero);
+        platform.PressKey([KeyboardInput.MediaPlayPauseKey], TimeSpan.Zero);
+        platform.PressKey([KeyboardInput.VolumeDownKey], TimeSpan.Zero);
+
+        await Assert.That(string.Join("|", runner.Invocations.Select(call => call.ArgumentText)))
+            .IsEqualTo("key --clearmodifiers XF86AudioNext|key --clearmodifiers XF86AudioPrev|key --clearmodifiers XF86AudioPlay|key --clearmodifiers XF86AudioLowerVolume");
+    }
+
+    [Test]
+    public async Task LinuxPlatform_TextEntryUsesClipboardThenControlV()
     {
         var runner = new RecordingCommandRunner("wl-copy", "xdotool");
-        var platform = new LinuxComputerRunPlatform(runner);
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
 
-        platform.PasteText("hello");
+        platform.TypeText("hello");
 
         await Assert.That(runner.Invocations[0].FileName).IsEqualTo("wl-copy");
         await Assert.That(runner.Invocations[0].StandardInput).IsEqualTo("hello");
@@ -133,12 +149,12 @@ public class ExternalCommandPlatformTests
     }
 
     [Test]
-    public async Task LinuxPlatform_PasteFallsBackToXdotoolTypeWhenClipboardToolsAreMissing()
+    public async Task LinuxPlatform_TextEntryFallsBackToXdotoolTypeWhenClipboardToolsAreMissing()
     {
         var runner = new RecordingCommandRunner("xdotool");
-        var platform = new LinuxComputerRunPlatform(runner);
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
 
-        platform.PasteText("hello");
+        platform.TypeText("hello");
 
         await Assert.That(runner.Invocations[0].ArgumentText).IsEqualTo("type --clearmodifiers --delay 0 -- hello");
     }
@@ -150,7 +166,7 @@ public class ExternalCommandPlatformTests
         {
             OnRun = _ => RecordingCommandRunner.Text("0x01200007  0 4242 host Terminal Window\n")
         };
-        var platform = new LinuxComputerRunPlatform(runner);
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
 
         var windows = platform.ListWindows(5);
 
@@ -175,7 +191,7 @@ public class ExternalCommandPlatformTests
                 _ => RecordingCommandRunner.Text(string.Empty),
             }
         };
-        var platform = new LinuxComputerRunPlatform(runner);
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
 
         var windows = platform.ListWindows(1);
 
@@ -188,7 +204,7 @@ public class ExternalCommandPlatformTests
     [Test]
     public async Task LinuxPlatform_MissingPointerDependencyThrowsActionableError()
     {
-        var platform = new LinuxComputerRunPlatform(new RecordingCommandRunner());
+        var platform = new LinuxComputerRunPlatform(new RecordingCommandRunner(), waylandSession: false);
 
         await Assert.That(() => platform.MoveCursor(1, 2))
             .Throws<PlatformNotSupportedException>()
@@ -202,11 +218,205 @@ public class ExternalCommandPlatformTests
         {
             OnRun = _ => RecordingCommandRunner.Result(1, string.Empty, "display unavailable")
         };
-        var platform = new LinuxComputerRunPlatform(runner);
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: false);
 
         await Assert.That(() => platform.MoveCursor(1, 2))
             .Throws<InvalidOperationException>()
             .WithMessageContaining("display unavailable");
+    }
+
+    [Test]
+    public async Task LinuxWaylandPlatform_UsesWdotoolForPointerAndKeyboardActions()
+    {
+        var runner = new RecordingCommandRunner("wdotool")
+        {
+            OnRun = invocation => invocation.ArgumentText == "getmouselocation --shell"
+                ? RecordingCommandRunner.Text("X=11\nY=22\nSCREEN=0\nWINDOW=1\n")
+                : RecordingCommandRunner.Text(string.Empty),
+        };
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: true);
+
+        platform.MoveCursor(3, 4);
+        var position = platform.GetCursorPosition();
+        platform.Click(MouseButton.Right, 2, TimeSpan.Zero);
+        platform.Scroll(3);
+        platform.PressHotkey([KeyboardInput.ControlKey, KeyboardInput.VKey]);
+        platform.TypeText("hello 世界");
+
+        await Assert.That(position.X).IsEqualTo(11);
+        await Assert.That(position.Y).IsEqualTo(22);
+        await Assert.That(runner.Invocations.All(call => call.FileName == "wdotool")).IsTrue();
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == "mousemove 3 4")).IsTrue();
+        await Assert.That(runner.Invocations.Count(call => call.ArgumentText == "click 3")).IsEqualTo(2);
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == "scroll 0 -3")).IsTrue();
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == "key --clearmodifiers Control_L+v")).IsTrue();
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == "type --clearmodifiers -- hello 世界")).IsTrue();
+    }
+
+    [Test]
+    public async Task LinuxWaylandPlatform_UsesWdotoolForWindowOperations()
+    {
+        var runner = new RecordingCommandRunner("wdotool", "wmctrl", "xdotool")
+        {
+            OnRun = invocation => invocation.ArgumentText switch
+            {
+                "search --name . --regex" => RecordingCommandRunner.Text("101\n"),
+                "getwindowname 101" => RecordingCommandRunner.Text("Wayland Terminal\n"),
+                "getwindowpid 101" => RecordingCommandRunner.Text("4242\n"),
+                _ => RecordingCommandRunner.Text(string.Empty),
+            },
+        };
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: true);
+
+        var windows = platform.ListWindows(5);
+        platform.ActivateWindow(101, restore: true);
+        platform.RequestCloseWindow(101);
+
+        await Assert.That(windows.Count).IsEqualTo(1);
+        await Assert.That(windows[0].Handle).IsEqualTo(101);
+        await Assert.That(windows[0].Title).IsEqualTo("Wayland Terminal");
+        await Assert.That(runner.Invocations.All(call => call.FileName == "wdotool")).IsTrue();
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == "windowactivate 101")).IsTrue();
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == "windowclose 101")).IsTrue();
+    }
+
+    [Test]
+    public async Task LinuxWaylandPlatform_ParsesWdotoolSearchRowsAndToleratesUnavailablePid()
+    {
+        const string wdotoolId = "zwlr_foreign_toplevel_handle_v1@4278190081";
+        var runner = new RecordingCommandRunner("wdotool")
+        {
+            OnRun = invocation => invocation.ArgumentText switch
+            {
+                "search --name . --regex" => RecordingCommandRunner.Text($"{wdotoolId}\t137 Discord\n"),
+                $"getwindowname {wdotoolId}" => RecordingCommandRunner.Text("137 Discord\n"),
+                $"getwindowpid {wdotoolId}" => RecordingCommandRunner.Result(1, string.Empty, "pid not available"),
+                _ => RecordingCommandRunner.Text(string.Empty),
+            },
+        };
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: true);
+
+        var windows = platform.ListWindows(5);
+        platform.ActivateWindow(4_278_190_081, restore: true);
+        platform.RequestCloseWindow(4_278_190_081);
+
+        await Assert.That(windows.Count).IsEqualTo(1);
+        await Assert.That(windows[0].Handle).IsEqualTo(4_278_190_081);
+        await Assert.That(windows[0].ProcessId).IsEqualTo(0);
+        await Assert.That(windows[0].ProcessName).IsNull();
+        await Assert.That(windows[0].Title).IsEqualTo("137 Discord");
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == $"getwindowname {wdotoolId}")).IsTrue();
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == $"windowactivate {wdotoolId}")).IsTrue();
+        await Assert.That(runner.Invocations.Any(call => call.ArgumentText == $"windowclose {wdotoolId}")).IsTrue();
+    }
+
+    [Test]
+    public async Task LinuxWaylandPlatform_DerivesVirtualBoundsFromScreenshot()
+    {
+        var runner = new RecordingCommandRunner("grim")
+        {
+            OnRun = invocation =>
+            {
+                File.WriteAllBytes(invocation.Arguments[0], CreatePngHeader(1920, 1080));
+                return RecordingCommandRunner.Text(string.Empty);
+            },
+        };
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: true);
+
+        var bounds = platform.GetVirtualScreenBounds();
+
+        await Assert.That(bounds).IsEqualTo(new System.Drawing.Rectangle(0, 0, 1920, 1080));
+        await Assert.That(Path.GetFileName(runner.Invocations.Single().Arguments[0])).StartsWith("codex-computer-run-");
+    }
+
+    [Test]
+    public async Task LinuxWaylandPlatform_CapturesRequestedRegionWithGrim()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "codex-computer-run-tests", Guid.NewGuid().ToString("N"), "wayland.png");
+        var runner = new RecordingCommandRunner("grim")
+        {
+            OnRun = invocation =>
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+                File.WriteAllBytes(invocation.Arguments[^1], CreatePngHeader(100, 80));
+                return RecordingCommandRunner.Text(string.Empty);
+            },
+        };
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: true);
+
+        try
+        {
+            platform.SaveScreenshotPng(new System.Drawing.Rectangle(4, 5, 100, 80), output);
+
+            await Assert.That(runner.Invocations.Single().ArgumentText).IsEqualTo($"-g 4,5 100x80 {output}");
+            await Assert.That(File.Exists(output)).IsTrue();
+        }
+        finally
+        {
+            TryDelete(output);
+        }
+    }
+
+    [Test]
+    public async Task LinuxWaylandPlatform_UsesSpectacleForFullPlasmaCapture()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "codex-computer-run-tests", Guid.NewGuid().ToString("N"), "plasma.png");
+        var runner = new RecordingCommandRunner("spectacle")
+        {
+            OnRun = invocation =>
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(invocation.Arguments[^1])!);
+                File.WriteAllBytes(invocation.Arguments[^1], CreatePngHeader(2560, 1440));
+                return RecordingCommandRunner.Text(string.Empty);
+            },
+        };
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: true);
+
+        try
+        {
+            var bounds = platform.GetVirtualScreenBounds();
+            platform.SaveScreenshotPng(bounds, output);
+
+            await Assert.That(bounds).IsEqualTo(new System.Drawing.Rectangle(0, 0, 2560, 1440));
+            await Assert.That(runner.Invocations.Count).IsEqualTo(2);
+            await Assert.That(runner.Invocations.All(call => call.FileName == "spectacle")).IsTrue();
+            await Assert.That(runner.Invocations[1].ArgumentText).IsEqualTo($"--background --nonotify --output {output}");
+            await Assert.That(File.Exists(output)).IsTrue();
+        }
+        finally
+        {
+            TryDelete(output);
+        }
+    }
+
+    [Test]
+    public async Task LinuxWaylandPlatform_RejectsRegionWhenCaptureToolOnlySupportsFullDesktop()
+    {
+        var runner = new RecordingCommandRunner("gnome-screenshot")
+        {
+            OnRun = invocation =>
+            {
+                File.WriteAllBytes(invocation.Arguments[1], CreatePngHeader(1920, 1080));
+                return RecordingCommandRunner.Text(string.Empty);
+            },
+        };
+        var platform = new LinuxComputerRunPlatform(runner, waylandSession: true);
+        var screen = platform.GetVirtualScreenBounds();
+
+        await Assert.That(() => platform.SaveScreenshotPng(new System.Drawing.Rectangle(0, 0, 500, 400), "unused.png"))
+            .Throws<PlatformNotSupportedException>()
+            .WithMessageContaining("Install grim");
+        await Assert.That(screen.Width).IsEqualTo(1920);
+    }
+
+    [Test]
+    public async Task LinuxWaylandPlatform_ReportsMissingWdotoolClearly()
+    {
+        var platform = new LinuxComputerRunPlatform(new RecordingCommandRunner(), waylandSession: true);
+
+        await Assert.That(() => platform.MoveCursor(1, 2))
+            .Throws<PlatformNotSupportedException>()
+            .WithMessageContaining("wdotool");
     }
 
     [Test]
@@ -278,12 +488,24 @@ public class ExternalCommandPlatformTests
     }
 
     [Test]
-    public async Task MacPlatform_PasteUsesPbcopyAndCommandV()
+    public async Task MacPlatform_GlobalMediaKeysFailWithAnActionableError()
+    {
+        var runner = new RecordingCommandRunner("osascript");
+        var platform = new MacComputerRunPlatform(runner);
+
+        await Assert.That(() => platform.PressKey([KeyboardInput.MediaNextTrackKey], TimeSpan.Zero))
+            .Throws<PlatformNotSupportedException>()
+            .WithMessageContaining("Global media and volume keys");
+        await Assert.That(runner.Invocations.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task MacPlatform_TextEntryUsesPbcopyAndCommandV()
     {
         var runner = new RecordingCommandRunner("pbcopy", "osascript");
         var platform = new MacComputerRunPlatform(runner);
 
-        platform.PasteText("hello");
+        platform.TypeText("hello");
 
         await Assert.That(runner.Invocations[0].FileName).IsEqualTo("pbcopy");
         await Assert.That(runner.Invocations[0].StandardInput).IsEqualTo("hello");
@@ -364,6 +586,14 @@ public class ExternalCommandPlatformTests
         {
             // Test cleanup only.
         }
+    }
+
+    private static byte[] CreatePngHeader(int width, int height)
+    {
+        byte[] png = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 0, 0, 0, 0, 0];
+        BinaryPrimitives.WriteInt32BigEndian(png.AsSpan(16, 4), width);
+        BinaryPrimitives.WriteInt32BigEndian(png.AsSpan(20, 4), height);
+        return png;
     }
 
     private sealed class RecordingCommandRunner(params string[] availableCommands) : IExternalCommandRunner
