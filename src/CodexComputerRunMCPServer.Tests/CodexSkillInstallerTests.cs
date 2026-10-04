@@ -185,6 +185,88 @@ public class CodexSkillInstallerTests
         }
     }
 
+    [Test]
+    public async Task TryAutoInstall_RefreshesPreviouslyInstalledBundledFiles()
+    {
+        var tempRoot = CreateTempRoot();
+        try
+        {
+            var codexHome = Path.Combine(tempRoot, ".codex");
+            var targetSkill = Path.Combine(codexHome, "skills", CodexSkillInstaller.SkillName);
+            Directory.CreateDirectory(Path.Combine(targetSkill, "agents"));
+            File.WriteAllText(Path.Combine(targetSkill, "SKILL.md"), "outdated bundled skill");
+            File.WriteAllText(Path.Combine(targetSkill, "agents", "openai.yaml"), "outdated bundled agent");
+            using var diagnostics = new StringWriter();
+            SkillInstallResult result;
+            SkillInstallResult secondResult;
+            lock (EnvironmentLock)
+            {
+                result = WithCodexHome(codexHome, () => CodexSkillInstaller.TryAutoInstall(diagnostics));
+                secondResult = WithCodexHome(codexHome, () => CodexSkillInstaller.TryAutoInstall(diagnostics));
+            }
+
+            await Assert.That(result.Installed).IsTrue();
+            await Assert.That(File.ReadAllText(Path.Combine(targetSkill, "SKILL.md"))).Contains("name: codex-computer-run");
+            await Assert.That(File.ReadAllText(Path.Combine(targetSkill, "agents", "openai.yaml"))).Contains("display_name:");
+            await Assert.That(secondResult.Skipped).IsTrue();
+            await Assert.That(diagnostics.ToString()).Contains("updated");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Test]
+    public async Task TryAutoInstall_ReturnsFailureAndDiagnosticWhenTargetIsBlocked()
+    {
+        var tempRoot = CreateTempRoot();
+        try
+        {
+            var codexHome = Path.Combine(tempRoot, ".codex");
+            Directory.CreateDirectory(codexHome);
+            File.WriteAllText(Path.Combine(codexHome, "skills"), "blocks the destination directory");
+            using var diagnostics = new StringWriter();
+            SkillInstallResult result;
+            lock (EnvironmentLock)
+            {
+                result = WithCodexHome(codexHome, () => CodexSkillInstaller.TryAutoInstall(diagnostics));
+            }
+
+            await Assert.That(result.Success).IsFalse();
+            await Assert.That(result.Installed).IsFalse();
+            await Assert.That(diagnostics.ToString()).Contains("Codex skill auto-install skipped:");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Test]
+    public async Task Install_SkipsUnchangedFilesWhenUpdating()
+    {
+        var tempRoot = CreateTempRoot();
+        try
+        {
+            var sourceSkill = CreateSourceSkill(tempRoot);
+            var codexHome = Path.Combine(tempRoot, ".codex");
+            CodexSkillInstaller.Install(sourceSkill, codexHome, overwrite: true);
+            var targetFile = Path.Combine(codexHome, "skills", CodexSkillInstaller.SkillName, "SKILL.md");
+            var preservedTimestamp = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            File.SetLastWriteTimeUtc(targetFile, preservedTimestamp);
+
+            var result = CodexSkillInstaller.Install(sourceSkill, codexHome, overwrite: true);
+
+            await Assert.That(result.Skipped).IsTrue();
+            await Assert.That(File.GetLastWriteTimeUtc(targetFile)).IsEqualTo(preservedTimestamp);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
     private static string CreateSourceSkill(string tempRoot)
     {
         var sourceSkill = Path.Combine(tempRoot, "source", CodexSkillInstaller.SkillName);

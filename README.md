@@ -6,7 +6,7 @@ Codex Computer Run MCP Server gives Codex and other MCP-capable agents direct co
 It exposes focused tools for screenshots, mouse movement, clicks, scrolling, keyboard shortcuts, Unicode text entry, metadata-based window targeting, bounded filesystem organization, and local Git workflows, plus a bundled Codex Skill for safe desktop-use workflows.
 
 It is implemented in C# on `net10.0` using `ModelContextProtocol` `2.2.0`.
-The current package and MCP manifest version is `1.2.0`.
+Package versions are calculated by MinVer from `v`-prefixed Git tags, with a `1.2` minimum major/minor version. Release builds stamp the MCP manifest with the package version.
 The package targets plain `net10.0` so it can be distributed as a .NET tool. Windows uses native Win32 APIs; Linux and macOS use best-effort command-backed adapters.
 
 ## Quick Install
@@ -44,7 +44,7 @@ Windows remains the primary implementation. Linux and macOS support keeps the sa
 
 | Area | Current behavior |
 |------|------------------|
-| Version | `1.2.0` |
+| Version | MinVer from Git tags (minimum major/minor `1.2`) |
 | Target framework | `net10.0` |
 | Windows | Native Win32 implementation with virtual-screen capture, a red cursor halo in screenshots, direct Unicode `SendInput`, cursor position, and visible top-level window enumeration |
 | Linux | Command-backed adapter using `xdotool`/`wmctrl` on X11 or `wdotool` on Wayland, with compositor-compatible screenshot commands |
@@ -78,7 +78,7 @@ When this server is active, agents should follow this operating protocol:
 
 The repository and NuGet package include a Codex Skill at `skills/codex-computer-run`. The skill teaches Codex the observation-first workflow, safety rules, and exact MCP tool names for this server.
 
-When the packaged server starts, it tries to install the skill into the current Codex installation if `CODEX_HOME` is set or `%USERPROFILE%\.codex` already exists. Existing skill files are not overwritten during automatic install.
+When the packaged server starts, it installs or refreshes the bundled skill in `CODEX_HOME/skills/codex-computer-run`, or `%USERPROFILE%\.codex\skills\codex-computer-run` when `CODEX_HOME` is unset. Automatic installation requires the Codex home directory to exist. Files supplied by the package are refreshed when their contents change, so updating the MCP server and starting it also updates the skill. Keep personal customizations in a separate skill because bundled files are managed by the server. Installation diagnostics go to standard error, and installation failures do not prevent MCP startup.
 
 Manual install from a globally installed tool:
 
@@ -100,7 +100,7 @@ $env:CODEX_HOME = "C:\Users\you\.codex"
 codex-computer-run-mcp-server --install-codex-skill
 ```
 
-To refresh an existing installed copy with the packaged skill files, add `--force`.
+The explicit installer preserves existing files unless you add `--force`. Normal MCP startup automatically refreshes the bundled files.
 
 Use the skill in Codex by asking for it explicitly, for example:
 
@@ -551,13 +551,33 @@ Coverage with TUnit/Microsoft Testing Platform:
 dotnet test --project .\src\CodexComputerRunMCPServer.Tests\CodexComputerRunMCPServer.Tests.csproj --configuration Release -- --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura --results-directory .\artifacts\test-results
 ```
 
-Current verification:
-- 61 TUnit tests passed.
-- Coverage: 77.65% line coverage, 48.37% branch coverage for testable code.
+Release and skill verification (2026-10-04):
+- 109 TUnit tests passed with .NET SDK 10.0.401; the solution builds with zero warnings and errors.
+- The coverage MCP reports 100% line and branch coverage for `TryAutoInstall` and `FilesMatch`, and 91.67% line coverage for the installer class.
 - Repository and package verification confirm `skills/codex-computer-run/SKILL.md` and `skills/codex-computer-run/agents/openai.yaml` are bundled.
+- Local installation from the packed tool verified automatic skill refresh and an MCP handshake discovering all 40 tools.
 - Native Win32 P/Invoke shims are excluded from coverage and verified through the service boundary plus live MCP tool discovery.
 
 ## Publish
+
+### Signed NuGet releases
+
+`BuildOnly.yml` builds and runs TUnit tests on Windows, Linux, and macOS for pushes and pull requests. Publishing is performed by the manually dispatched `BuildDeploy.yml`, following the UIInspect.MCP release setup: calculate the version, test and pack, sign with Certum SimplySign, verify the signer certificate, publish the signed artifact through NuGet trusted publishing, then create the GitHub release. Main-branch pushes run verification only.
+
+Configure the GitHub `release` environment with these secrets:
+
+| Secret | Value |
+|--------|-------|
+| `CERTUM_USER_ID` | SimplySign account user ID |
+| `CERTUM_OTP_URI` | SimplySign TOTP URI |
+| `CERTUM_CERT_FINGERPRINT` | Signing certificate SHA-256 fingerprint |
+| `NUGET_USER` | NuGet.org profile name that owns or can publish the package |
+
+Create a NuGet.org trusted publishing policy for repository owner `ChrisPulman`, repository `CodexComputerRunMCPServer`, workflow filename `BuildDeploy.yml`, and environment `release`, with scope for `CP.CodexComputerRun.Mcp.Server*` (the pointer package and six platform packages). See the [NuGet trusted publishing setup](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing). The workflow uses the same `ghcr.io/reactiveui/certum-signer:latest` image as UIInspect.MCP; the signing job requires that image to be accessible. Every platform package is published before the pointer package, following the [.NET tool publishing requirements](https://learn.microsoft.com/en-us/dotnet/core/tools/rid-specific-tools#publish-your-tool).
+
+Dispatch **BuildDeploy** with a `patch`, `minor`, or `major` bump, and a `none` (stable), `alpha`, `beta`, or `rc` channel. Optionally choose a source Git ref. New releases use `v`-prefixed tags; existing unprefixed tags are retained. With no stable `v` tag, the version calculation starts at `1.2.0`, so the first patch release is `1.2.1`. Pre-release sequence numbers increment for the selected version and channel. The package, bundled MCP manifest, release tag, and GitHub release use the same calculated version.
+
+### Published executables
 
 The helper script name is historical; it now accepts Windows, Linux, and macOS runtime identifiers.
 
