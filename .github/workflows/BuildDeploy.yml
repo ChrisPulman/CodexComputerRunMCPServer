@@ -29,6 +29,12 @@ on:
         type: string
         default: ''
 
+      releaseVersion:
+        description: 'Optional exact version (for example 1.3.0) to recover a partially published release. Overrides bump/channel.'
+        required: false
+        type: string
+        default: ''
+
 permissions:
   contents: read
 
@@ -71,6 +77,7 @@ jobs:
         env:
           BUMP: ${{ inputs.bump }}
           CHANNEL: ${{ inputs.channel }}
+          RELEASE_VERSION: ${{ inputs.releaseVersion }}
           TAG_PREFIX: v
           MINIMUM_MAJOR_MINOR: ${{ env.minMajorMinorVersion }}
         run: |
@@ -138,6 +145,16 @@ jobs:
             PRERELEASE=false
           fi
 
+          if [ -n "$RELEASE_VERSION" ]; then
+            if [[ ! "$RELEASE_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$ ]]; then
+              echo "::error::releaseVersion must be X.Y.Z or X.Y.Z-alpha/beta/rc.N."
+              exit 1
+            fi
+            VERSION="$RELEASE_VERSION"
+            PRERELEASE=false
+            [[ "$VERSION" != *-* ]] || PRERELEASE=true
+          fi
+
           TAG="${TAG_PREFIX}${VERSION}"
           if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
             echo "::error::Tag ${TAG} already exists. Refusing to re-release an existing version."
@@ -193,6 +210,48 @@ jobs:
       - name: Pack unsigned NuGet package
         working-directory: src
         run: dotnet pack CodexComputerRunMCPServer/CodexComputerRunMCPServer.csproj -c Release --no-restore -o ../packages /p:ContinuousIntegrationBuild=true
+
+      - name: Validate packaged MCP metadata and versions
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.release-version.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $packages = @(Get-ChildItem packages/*.nupkg)
+          if ($packages.Count -ne 7) { throw "Expected the pointer and six platform packages; found $($packages.Count)." }
+          foreach ($package in $packages) {
+            $archive = [IO.Compression.ZipFile]::OpenRead($package.FullName)
+            try {
+              $entry = $archive.GetEntry('.mcp/server.json')
+              if ($null -eq $entry) { throw "$($package.Name): missing MCP metadata." }
+              $stream = $entry.Open()
+              $buffer = [IO.MemoryStream]::new()
+              try { $stream.CopyTo($buffer); $bytes = $buffer.ToArray() }
+              finally { $stream.Dispose(); $buffer.Dispose() }
+              if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+                throw "$($package.Name): MCP metadata must use UTF-8 without a BOM."
+              }
+              $json = [Text.UTF8Encoding]::new($false, $true).GetString($bytes)
+              # Match NuGet Gallery's raw UTF-8 decoding and Newtonsoft.Json parser.
+              $metadata = [Newtonsoft.Json.JsonConvert]::DeserializeObject($json)
+              if ($metadata.version -ne $env:RELEASE_VERSION -or $metadata.packages.Count -ne 1 -or
+                  $metadata.packages[0].version -ne $env:RELEASE_VERSION -or
+                  $metadata.packages[0].identifier -ne 'CP.CodexComputerRun.Mcp.Server' -or
+                  $metadata.packages[0].registryType -ne 'nuget') {
+                throw "$($package.Name): MCP package identity/version does not match the release."
+              }
+              $nuspecEntry = @($archive.Entries | Where-Object FullName -like '*.nuspec')
+              if ($nuspecEntry.Count -ne 1) { throw "$($package.Name): expected one nuspec." }
+              $reader = [IO.StreamReader]::new($nuspecEntry[0].Open())
+              try { [xml]$nuspec = $reader.ReadToEnd() } finally { $reader.Dispose() }
+              if ($nuspec.package.metadata.version -ne $env:RELEASE_VERSION) {
+                throw "$($package.Name): nuspec version does not match the release."
+              }
+              Write-Host "Validated $($package.Name) ($env:RELEASE_VERSION)"
+            }
+            finally { $archive.Dispose() }
+          }
 
       - name: Upload unsigned packages
         uses: actions/upload-artifact@v7
