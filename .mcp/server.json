@@ -3,13 +3,13 @@
   "name": "io.github.chrispulman/codex-computer-run-mcp-server",
   "title": "Codex Computer Run MCP Server",
   "description": "MCP server for desktop control and general workstation automation: screenshots, mouse, keyboard, window targeting, graceful close, bounded filesystem organization, local Git workflows, process recovery, URL entry points, and a bundled Codex Skill.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "packages": [
     {
       "registryType": "nuget",
       "registryBaseUrl": "https://api.nuget.org/v3/index.json",
       "identifier": "CP.CodexComputerRun.Mcp.Server",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "runtimeHint": "dnx",
       "transport": {
         "type": "stdio"

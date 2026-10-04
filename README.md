@@ -577,6 +577,8 @@ Create a NuGet.org trusted publishing policy for repository owner `ChrisPulman`,
 
 Dispatch **BuildDeploy** with a `patch`, `minor`, or `major` bump, and a `none` (stable), `alpha`, `beta`, or `rc` channel. Optionally choose a source Git ref. New releases use `v`-prefixed tags; existing unprefixed tags are retained. With no stable `v` tag, the version calculation starts at `1.2.0`, so the first patch release is `1.2.1`. Pre-release sequence numbers increment for the selected version and channel. The package, bundled MCP manifest, release tag, and GitHub release use the same calculated version.
 
+To recover a partially published release, set **releaseVersion** to its exact version (for example `1.3.0`). This overrides the bump/channel calculation; an existing Git tag still prevents a completed release from being repeated. Already published platform packages are skipped, allowing the missing pointer package to be published at the same version. Packaged MCP metadata is checked for BOM-free UTF-8, valid JSON, package identity, and matching release versions before signing or publishing.
+
 ### Published executables
 
 The helper script name is historical; it now accepts Windows, Linux, and macOS runtime identifiers.

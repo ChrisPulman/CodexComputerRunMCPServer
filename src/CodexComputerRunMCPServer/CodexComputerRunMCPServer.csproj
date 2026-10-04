@@ -33,16 +33,17 @@
     <None Include="..\..\README.md" Pack="true" PackagePath="" Link="README.md" />
     <None Include="..\..\skills\codex-computer-run\**\*.*" Pack="true" PackagePath="skills\codex-computer-run\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="skills\codex-computer-run" />
   </ItemGroup>
-  <Target Name="GenerateMcpPackageManifest" BeforeTargets="_GetPackageFiles" DependsOnTargets="MinVer">
+  <Target Name="GenerateMcpPackageManifest" BeforeTargets="BeforeBuild;_GetPackageFiles" DependsOnTargets="MinVer">
     <PropertyGroup>
       <_McpManifestPath>$(IntermediateOutputPath)mcp/server.json</_McpManifestPath>
       <_McpManifest>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/../../.mcp/server.json'))</_McpManifest>
       <_McpManifest>$([System.Text.RegularExpressions.Regex]::Replace('$(_McpManifest)', '&quot;version&quot;\s*:\s*&quot;[^&quot;]*&quot;', '&quot;version&quot;: &quot;$(PackageVersion)&quot;'))</_McpManifest>
     </PropertyGroup>
     <MakeDir Directories="$(IntermediateOutputPath)mcp" />
-    <WriteLinesToFile File="$(_McpManifestPath)" Lines="$(_McpManifest)" Overwrite="true" Encoding="UTF-8" />
+    <!-- The default encoding is UTF-8 without a BOM. NuGet reads raw UTF-8 bytes as JSON. -->
+    <WriteLinesToFile File="$(_McpManifestPath)" Lines="$(_McpManifest)" Overwrite="true" />
     <ItemGroup>
-      <None Include="$(_McpManifestPath)" Pack="true" PackagePath=".mcp/server.json" />
+      <None Include="$(_McpManifestPath)" Pack="true" PackagePath=".mcp/server.json" Link=".mcp/server.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>
 </Project>
