@@ -1,0 +1,42 @@
+name: BuildOnly
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        working-directory: src
+        run: dotnet restore CodexComputerRunMCPServer.slnx
+      - name: Build
+        working-directory: src
+        run: dotnet build CodexComputerRunMCPServer.slnx -c Release --no-restore /p:ContinuousIntegrationBuild=true
+      - name: Test
+        working-directory: src
+        run: dotnet test --solution CodexComputerRunMCPServer.slnx -c Release --no-restore
+      - name: Validate package
+        if: matrix.os == 'windows-latest'
+        working-directory: src
+        run: dotnet pack CodexComputerRunMCPServer/CodexComputerRunMCPServer.csproj -c Release --no-restore -o ../packages /p:ContinuousIntegrationBuild=true
+

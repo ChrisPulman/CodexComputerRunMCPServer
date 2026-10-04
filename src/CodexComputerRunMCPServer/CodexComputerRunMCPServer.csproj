@@ -5,7 +5,6 @@
     <AssemblyName>CodexComputerRunMCPServer</AssemblyName>
     <RootNamespace>CodexComputerRunMCPServer</RootNamespace>
     <PackageId>CP.CodexComputerRun.Mcp.Server</PackageId>
-    <Version>1.2.0</Version>
     <Title>Codex Computer Run MCP Server</Title>
     <Description>MCP server for Codex desktop control and general workstation automation: screenshots, mouse, keyboard, Unicode text entry, window discovery, semantic Windows UI Automation, graceful close, bounded filesystem organization, local Git workflows, process recovery, URL entry points, and a bundled Codex Skill. Windows uses native Win32 APIs; Linux and macOS use best-effort desktop command adapters.</Description>
     <Authors>Chris Pulman</Authors>
@@ -25,13 +24,25 @@
     <SelfContained>false</SelfContained>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="MinVer" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="System.Drawing.Common" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="" Link="README.md" />
-    <None Include="..\..\.mcp\server.json" Pack="true" PackagePath=".mcp\server.json" Link=".mcp\server.json" />
-    <None Include="..\..\skills\codex-computer-run\**\*.*" Pack="true" PackagePath="tools\$(TargetFramework)\any\skills\codex-computer-run\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" LinkBase="skills\codex-computer-run" />
+    <None Include="..\..\skills\codex-computer-run\**\*.*" Pack="true" PackagePath="skills\codex-computer-run\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="skills\codex-computer-run" />
   </ItemGroup>
+  <Target Name="GenerateMcpPackageManifest" BeforeTargets="_GetPackageFiles" DependsOnTargets="MinVer">
+    <PropertyGroup>
+      <_McpManifestPath>$(IntermediateOutputPath)mcp/server.json</_McpManifestPath>
+      <_McpManifest>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/../../.mcp/server.json'))</_McpManifest>
+      <_McpManifest>$([System.Text.RegularExpressions.Regex]::Replace('$(_McpManifest)', '&quot;version&quot;\s*:\s*&quot;[^&quot;]*&quot;', '&quot;version&quot;: &quot;$(PackageVersion)&quot;'))</_McpManifest>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)mcp" />
+    <WriteLinesToFile File="$(_McpManifestPath)" Lines="$(_McpManifest)" Overwrite="true" Encoding="UTF-8" />
+    <ItemGroup>
+      <None Include="$(_McpManifestPath)" Pack="true" PackagePath=".mcp/server.json" />
+    </ItemGroup>
+  </Target>
 </Project>
