@@ -35,7 +35,16 @@ internal static class CodexSkillInstaller
 
     public static SkillInstallResult TryAutoInstall(TextWriter diagnostics)
     {
-        var result = InstallBundledSkill(createCodexHome: false, overwrite: false);
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        SkillInstallResult result;
+        try
+        {
+            result = InstallBundledSkill(createCodexHome: false, overwrite: true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            result = SkillInstallResult.Failure(exception.Message);
+        }
         if (result.Installed)
         {
             diagnostics.WriteLine(result.Message);
@@ -83,7 +92,7 @@ internal static class CodexSkillInstaller
                 Directory.CreateDirectory(targetDirectory);
             }
 
-            if (File.Exists(targetFile) && !overwrite)
+            if (File.Exists(targetFile) && (!overwrite || FilesMatch(sourceFile, targetFile)))
             {
                 skippedFiles++;
                 continue;
@@ -101,6 +110,10 @@ internal static class CodexSkillInstaller
         var verb = overwrite ? "Installed or updated" : "Installed";
         return SkillInstallResult.InstalledAt($"{verb} Codex skill at {targetSkillDirectory}", targetSkillDirectory);
     }
+
+    private static bool FilesMatch(string sourceFile, string targetFile)
+        => new FileInfo(sourceFile).Length == new FileInfo(targetFile).Length
+            && File.ReadAllBytes(sourceFile).AsSpan().SequenceEqual(File.ReadAllBytes(targetFile));
 
     private static string? ResolveCodexHome(bool create)
     {

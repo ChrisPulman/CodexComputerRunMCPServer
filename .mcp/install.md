@@ -35,7 +35,7 @@ Bundled Codex Skill install:
 codex-computer-run-mcp-server --install-codex-skill
 ```
 
-The server also auto-installs the bundled `codex-computer-run` skill on startup when `CODEX_HOME` is set or `%USERPROFILE%\.codex` already exists. Existing skill files are left untouched unless the installer is run with `--force`.
+The server installs or refreshes the bundled `codex-computer-run` skill on each startup when the configured `CODEX_HOME` directory or default `%USERPROFILE%\.codex` directory exists. Updating the server and starting it refreshes changed bundled files automatically. Keep customizations in a separate skill. Explicit installation preserves existing files unless you pass `--force`; it can also create the Codex home directory. Diagnostics use standard error, and automatic installation failures do not prevent MCP startup.
 
 Alternative source-run config for development:
 
